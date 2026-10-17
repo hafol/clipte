@@ -11,7 +11,8 @@ import {
   type PayoutMethodRow,
 } from '@/lib/supabase/data';
 import { NotchButton } from '@/components/pi';
-import { PageHeader, StatStrip, Section, Chip, EmptyState, ErrorNote, SkeletonRows, usd } from '@/components/dashboard/ui';
+import { PageHeader, StatStrip, Section, Chip, EmptyState, ErrorNote, SkeletonRows, money, usd, kzt } from '@/components/dashboard/ui';
+import { moneyState } from '@/lib/money';
 import { Btn, Field, Modal, Notice, inputCls, timeAgo, useToast } from '@/components/dashboard/forms';
 import {
   PaypalColorIcon, TetherColorIcon, UsdcColorIcon, BitcoinColorIcon, EthereumColorIcon, SolanaColorIcon,
@@ -64,16 +65,16 @@ function ClipperWallet({ profile, onChange }: { profile: Profile; onChange: () =
         }
       />
 
-      {processing.length > 0 && <Notice tone="blue">{t('pay.inProgress').replace('{n}', usd(processing[0].amount))}</Notice>}
+      {processing.length > 0 && <Notice tone="blue">{t('pay.inProgress').replace('{n}', money(processing[0].amount))}</Notice>}
       {!loading && data.methods.length === 0 && <Notice tone="amber">{t('pay.addMethodFirst')}</Notice>}
 
       <StatStrip
         loading={loading}
         items={[
-          { label: t('overview.c.available'), value: usd(profile.balance_earnings), hint: t('pay.availableHint') },
-          { label: t('pay.processing'), value: usd(processing.reduce((a, p) => a + p.amount, 0)), hint: t('pay.processingHint') },
-          { label: t('pay.paidOut'), value: usd(paidOut), hint: t('pay.paidOutHint') },
-          { label: t('overview.c.earned'), value: usd(profile.total_earnings), hint: t('overview.c.earnedHint') },
+          { label: t('overview.c.available'), value: money(profile.balance_earnings), hint: t('pay.availableHint') },
+          { label: t('pay.processing'), value: money(processing.reduce((a, p) => a + p.amount, 0)), hint: t('pay.processingHint') },
+          { label: t('pay.paidOut'), value: money(paidOut), hint: t('pay.paidOutHint') },
+          { label: t('overview.c.earned'), value: money(profile.total_earnings), hint: t('overview.c.earnedHint') },
         ]}
       />
 
@@ -172,7 +173,7 @@ function ClipperWallet({ profile, onChange }: { profile: Profile; onChange: () =
                       {p.failure_reason ? ` · ${p.failure_reason}` : ''}
                     </span>
                   </div>
-                  <span className="text-sm tabular-nums text-[var(--pi-ink-strong)]">{usd(p.amount)}</span>
+                  <span className="text-sm tabular-nums text-[var(--pi-ink-strong)]">{money(p.amount)}</span>
                   <Chip tone={p.status === 'completed' ? 'green' : p.status === 'failed' ? 'red' : 'blue'}>{t(`pay.st.${p.status}`)}</Chip>
                 </li>
               ))}
@@ -318,7 +319,10 @@ function Withdraw({
         <div className="border-b border-[var(--pi-line)] pb-4">
           <span className="text-[13px] text-[var(--pi-muted)]">{t('pay.youGet')}</span>
           <p className="mt-1 text-[2.5rem] font-light leading-none tracking-[-0.05em] tabular-nums text-[var(--pi-ink-strong)]">{usd(amount)}</p>
-          <p className="mt-2 text-xs text-[var(--pi-muted)]">{t('pay.wholeBalance')}</p>
+          <p className="mt-2 text-xs text-[var(--pi-muted)]">
+            {moneyState().rate ? `≈ ${kzt(amount)} · ` : ''}
+            {t('pay.wholeBalance')}
+          </p>
         </div>
         <div className="space-y-2">
           {methods.map((m) => {
@@ -372,10 +376,10 @@ function BrandWallet({ profile }: { profile: Profile }) {
       <StatStrip
         loading={loading || mine.loading}
         items={[
-          { label: t('pay.deposited'), value: usd(funded), hint: t('pay.depositedHint').replace('{n}', String(paid.length)) },
-          { label: t('pay.inCampaigns'), value: usd(inCampaigns), hint: t('pay.inCampaignsHint') },
-          { label: t('overview.b.spent'), value: usd(spent), hint: t('overview.b.spentHint') },
-          { label: t('pay.refunds'), value: usd(profile.balance_escrow), hint: t('pay.refundsHint') },
+          { label: t('pay.deposited'), value: money(funded), hint: t('pay.depositedHint').replace('{n}', String(paid.length)) },
+          { label: t('pay.inCampaigns'), value: money(inCampaigns), hint: t('pay.inCampaignsHint') },
+          { label: t('overview.b.spent'), value: money(spent), hint: t('overview.b.spentHint') },
+          { label: t('pay.refunds'), value: money(profile.balance_escrow), hint: t('pay.refundsHint') },
         ]}
       />
 
@@ -417,7 +421,7 @@ function BrandWallet({ profile }: { profile: Profile }) {
                     #{d.invoice_id} · {timeAgo(d.created_at, lang)}
                   </span>
                 </div>
-                <span className="text-sm tabular-nums text-[var(--pi-ink-strong)]">{usd(d.amount)}</span>
+                <span className="text-sm tabular-nums text-[var(--pi-ink-strong)]">{money(d.amount)}</span>
                 <Chip tone={d.status === 'paid' ? 'green' : d.status === 'pending' ? 'amber' : 'muted'}>{t(`pay.dep.${d.status}`)}</Chip>
               </li>
             ))}

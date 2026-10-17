@@ -654,6 +654,195 @@ export function useAdminData(enabled: boolean) {
   );
 }
 
+/* ============================== Stats ============================== */
+
+export type StatScope = 'me' | 'brand' | 'campaign' | 'clip' | 'platform';
+export interface SeriesPoint { day: string; views: number; earned: number; clips: number }
+
+const viewerTz = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+};
+
+/** Daily views gained / money settled / clips submitted for a chart. Empty until v2.8 is run. */
+export function useSeries(scope: StatScope, id: string | null | undefined, days: number, enabled = true) {
+  const needsId = scope === 'campaign' || scope === 'clip';
+  return useLoad<SeriesPoint[]>(
+    async () => {
+      const rows = await softRpc<any[]>('stats_series', { p_scope: scope, p_id: id ?? null, p_days: days, p_tz: viewerTz() }, []);
+      return rows.map((r) => ({ day: String(r.day), views: num(r.views), earned: num(r.earned), clips: num(r.clips) }));
+    },
+    enabled && (!needsId || id) ? `series:${scope}:${id ?? ''}:${days}` : null,
+    []
+  );
+}
+
+export interface CampaignAnalytics {
+  totals: { views: number; paid_views: number; clips: number; clippers: number; earned: number; verified: number; hold: number; problems: number };
+  platforms: { platform: Platform; views: number; clips: number; earned: number }[];
+  clippers: { id: string; name: string | null; avatar: string | null; views: number; earned: number; clips: number }[];
+  top_clips: { id: string; platform: Platform; url: string; views: number; earned: number; status: ClipStatus; created_at: string; handle: string | null }[];
+}
+
+const numify = <T extends Record<string, any>>(rows: T[] | null | undefined, keys: (keyof T)[]) =>
+  (rows || []).map((r) => ({ ...r, ...Object.fromEntries(keys.map((k) => [k, num(r[k])])) })) as T[];
+const numObj = <T,>(o: Record<string, unknown> | null | undefined) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, num(v)])) as T;
+
+export function useCampaignAnalytics(id: string | null | undefined, enabled: boolean) {
+  return useLoad<CampaignAnalytics | null>(
+    async () => {
+      const a = await softRpc<any>('campaign_analytics', { p_campaign_id: id }, null);
+      if (!a) return null;
+      return {
+        totals: numObj<CampaignAnalytics['totals']>(a.totals),
+        platforms: numify(a.platforms, ['views', 'clips', 'earned']),
+        clippers: numify(a.clippers, ['views', 'earned', 'clips']),
+        top_clips: numify(a.top_clips, ['views', 'earned']),
+      };
+    },
+    enabled && id ? `canalytics:${id}` : null,
+    null
+  );
+}
+
+export interface PlatformAnalytics {
+  totals: Record<
+    | 'users' | 'new_users' | 'active_clippers' | 'brands' | 'live_campaigns' | 'funded' | 'funded_period' | 'in_escrow'
+    | 'earned' | 'earned_period' | 'paid_out' | 'pending_payouts' | 'views' | 'clips' | 'clips_period' | 'flagged',
+    number
+  >;
+  signups: { day: string; n: number }[];
+  funding: { day: string; amount: number }[];
+  platforms: { platform: Platform; views: number; clips: number; earned: number }[];
+  top_campaigns: { id: string; title: string; brand_name: string; status: CampaignStatus; views: number; spent: number; budget: number }[];
+  top_clippers: { id: string; name: string | null; avatar: string | null; earned: number; views: number; clips: number }[];
+}
+
+export function usePlatformAnalytics(days: number, enabled: boolean) {
+  return useLoad<PlatformAnalytics | null>(
+    async () => {
+      const a = await softRpc<any>('platform_analytics', { p_days: days }, null);
+      if (!a) return null;
+      return {
+        totals: numObj<PlatformAnalytics['totals']>(a.totals),
+        signups: numify(a.signups, ['n']),
+        funding: numify(a.funding, ['amount']),
+        platforms: numify(a.platforms, ['views', 'clips', 'earned']),
+        top_campaigns: numify(a.top_campaigns, ['views', 'spent', 'budget']),
+        top_clippers: numify(a.top_clippers, ['earned', 'views', 'clips']),
+      };
+    },
+    enabled ? `panalytics:${days}` : null,
+    null
+  );
+}
+
+/** Every view reading of one clip (owner / staff), oldest first — the clip detail chart. */
+export function useClipReadings(clipId: string | null | undefined) {
+  const supabase = getSupabaseBrowserClient();
+  return useLoad<{ views: number; at: string; source: string }[]>(
+    async () => {
+      const { data, error } = await supabase
+        .from('view_snapshots')
+        .select('views, captured_at, source')
+        .eq('clip_id', clipId!)
+        .order('captured_at', { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      return (data || []).map((r: any) => ({ views: num(r.views), at: r.captured_at, source: r.source }));
+    },
+    clipId ? `readings:${clipId}` : null,
+    []
+  );
+}
+
+/** Readings of the last 14 days per clip → sparkline + "+12k today" on clip lists. */
+export function useClipDeltas(clipIds: string[]) {
+  const supabase = getSupabaseBrowserClient();
+  const key = clipIds.length ? `deltas:${clipIds.slice().sort().join(',')}` : null;
+  return useLoad<Record<string, { day: number; series: number[] }>>(
+    async () => {
+      const since = new Date(Date.now() - 14 * 86400_000).toISOString();
+      const { data } = await supabase
+        .from('view_snapshots')
+        .select('clip_id, views, captured_at')
+        .in('clip_id', clipIds)
+        .gte('captured_at', since)
+        .order('captured_at', { ascending: true })
+        .limit(3000);
+      const out: Record<string, { day: number; series: number[] }> = {};
+      const dayAgo = Date.now() - 86400_000;
+      for (const id of clipIds) {
+        const rows = (data || []).filter((r: any) => r.clip_id === id);
+        if (!rows.length) continue;
+        const last = num(rows[rows.length - 1].views);
+        const before = rows.filter((r: any) => Date.parse(r.captured_at) <= dayAgo);
+        const base = before.length ? num(before[before.length - 1].views) : 0;
+        out[id] = { day: Math.max(0, last - base), series: rows.map((r: any) => num(r.views)) };
+      }
+      return out;
+    },
+    key,
+    {}
+  );
+}
+
+/* ============================== Saved campaigns ============================== */
+
+export function useSavedCampaigns(userId?: string) {
+  const supabase = getSupabaseBrowserClient();
+  const load = useLoad<string[]>(
+    async () => {
+      const { data, error } = await supabase.from('saved_campaigns').select('campaign_id').order('created_at', { ascending: false });
+      if (error) return []; // v2.8 not run yet
+      return (data || []).map((r: any) => r.campaign_id);
+    },
+    userId ? `saved:${userId}` : null,
+    []
+  );
+  const toggle = async (campaignId: string) => {
+    const before = load.data;
+    const saved = before.includes(campaignId);
+    load.setData(saved ? before.filter((x) => x !== campaignId) : [campaignId, ...before]); // optimistic
+    const { error } = saved
+      ? await supabase.from('saved_campaigns').delete().eq('campaign_id', campaignId)
+      : await supabase.from('saved_campaigns').insert({ user_id: userId, campaign_id: campaignId });
+    if (error) {
+      load.setData(before);
+      throw error;
+    }
+    return !saved;
+  };
+  return { saved: load.data, isSaved: (id: string) => load.data.includes(id), toggle, loading: load.loading };
+}
+
+/* ============================== Clip preview ============================== */
+
+export interface ClipPreview {
+  ok: boolean;
+  platform?: Platform;
+  title?: string | null;
+  thumbnail?: string | null;
+  author?: string | null;
+  ownership?: 'matched' | 'mismatch' | 'unconfirmed' | 'no_account';
+  accounts?: string[];
+  duplicate?: boolean;
+  error?: string;
+}
+
+export async function previewClip(url: string, campaignId: string, signal?: AbortSignal): Promise<ClipPreview> {
+  const res = await fetch('/api/clips/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, campaignId }),
+    signal,
+  });
+  return res.json().catch(() => ({ ok: false }));
+}
+
 /* ============================== Tracking ============================== */
 
 export interface TrackingRun {

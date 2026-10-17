@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronDown, ChevronLeft, ChevronRight, Check } from '@/components/icons';
+import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, Check } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
 import { type CampaignRow, type Face, type Platform, rateFor, PLATFORM_NAME } from '@/lib/supabase/data';
-import { PlatformIcon, usd } from './ui';
+import { PlatformIcon, money, kzt } from './ui';
+import { moneyState } from '@/lib/money';
 import { NotchButton } from '@/components/pi';
 
 // Discover building blocks — structure of Whop "Content Rewards", rebuilt on Clipte data and tokens.
@@ -13,9 +14,44 @@ import { NotchButton } from '@/components/pi';
 
 type Stats = { clippers: number; faces: Face[] };
 
-const money0 = (n: number) => `$${Math.round(n).toLocaleString('en-US').replace(/,/g, ' ')}`;
-const moneyK = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}K` : `$${Math.round(n)}`);
-const rateTxt = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
+/** Saved campaigns, provided by DiscoverView so every card (grid, rows) can show and toggle its bookmark. */
+export const SavedContext = createContext<{ isSaved: (id: string) => boolean; toggle: (id: string) => void } | null>(null);
+
+function SaveButton({ id }: { id: string }) {
+  const ctx = useContext(SavedContext);
+  const { t } = useLanguage();
+  const [pop, setPop] = useState(false);
+  if (!ctx) return null;
+  const on = ctx.isSaved(id);
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      aria-label={on ? t('disc.unsave') : t('disc.save')}
+      title={on ? t('disc.unsave') : t('disc.save')}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setPop(true);
+        setTimeout(() => setPop(false), 450);
+        ctx.toggle(id);
+      }}
+      className={`cr-save absolute right-2.5 top-2.5 z-[2] flex size-8 items-center justify-center rounded-full backdrop-blur-md transition-[opacity,transform,background-color] duration-300 cursor-pointer ${
+        on ? 'bg-white text-[#111] opacity-100' : 'bg-black/35 text-white opacity-100 hover:bg-black/55 lg:opacity-0! lg:group-hover/card:opacity-100!'
+      } ${pop ? 'cr-save-pop' : ''}`}
+    >
+      <Bookmark className={`size-4 ${on ? '[&_.ci-fill]:opacity-100!' : ''}`} strokeWidth={1.8} />
+    </button>
+  );
+}
+
+// follow the viewer's $ / ₸ choice (see lib/money); tenge gets compact forms where space is tight
+const inKzt = () => moneyState().currency === 'KZT' && !!moneyState().rate;
+const toKzt = (n: number) => n * (moneyState().rate || 0);
+const shortK = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, '')}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}K` : String(Math.round(n)));
+const money0 = (n: number) => (inKzt() ? kzt(n) : `$${Math.round(n).toLocaleString('en-US').replace(/,/g, ' ')}`);
+const moneyK = (n: number) => (inKzt() ? `${shortK(toKzt(n))} ₸` : n >= 1000 ? `$${shortK(n)}` : `$${Math.round(n)}`);
+const rateTxt = (n: number) => (inKzt() ? `${Math.round(toKzt(n)).toLocaleString('ru-RU')} ₸` : `$${Number.isInteger(n) ? n : n.toFixed(2)}`);
 const shortAgo = (iso: string) => {
   const h = Math.max(0, (Date.now() - Date.parse(iso)) / 3_600_000);
   if (h < 1) return 'new';
@@ -110,6 +146,7 @@ export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = tr
       {/* top half: cover — squared bottom, fully rounded once the card splits */}
       <div className="cr-card relative aspect-video w-full overflow-hidden rounded-t-2xl bg-[var(--pi-line)] lg:group-hover/card:rounded-2xl!">
         <Cover c={c} className={interactive ? 'transition-transform duration-[1200ms] ease-out lg:group-hover/card:scale-[1.03]!' : ''} />
+        {interactive && <SaveButton id={c.id} />}
       </div>
 
       {/* the split: a badge row opens between the halves on hover */}
@@ -127,7 +164,7 @@ export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = tr
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
               {n.minPay && (
-                <Tip below text={t('card.minTip').replace('{n}', usd(n.minPay))}>
+                <Tip below text={t('card.minTip').replace('{n}', money(n.minPay))}>
                   <span className="cr-chip relative flex h-6 cursor-help items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold tabular-nums text-[var(--pi-ink-strong)]">
                     {t('card.min')} {money0(n.minPay)} <InfoDot />
                   </span>
@@ -186,8 +223,9 @@ export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = tr
             <Tip text={t('card.budgetTip')} align="left">
               <span className="block cursor-help truncate whitespace-nowrap text-[12px] font-semibold leading-[14px] tabular-nums">
                 <span className="@max-[250px]:hidden!">
-                  <span className="text-[var(--pi-ink-strong)]">{money0(c.remaining_budget)}</span>
-                  <span className="text-[var(--pi-muted)]">/{money0(c.escrow_budget)}</span>
+                  {/* tenge amounts are 3 digits longer — use the short form so the row never clips */}
+                  <span className="text-[var(--pi-ink-strong)]">{inKzt() ? moneyK(c.remaining_budget) : money0(c.remaining_budget)}</span>
+                  <span className="text-[var(--pi-muted)]">/{inKzt() ? moneyK(c.escrow_budget) : money0(c.escrow_budget)}</span>
                 </span>
                 <span className="hidden @max-[250px]:inline!">
                   <span className="text-[var(--pi-ink-strong)]">{moneyK(c.remaining_budget)}</span>

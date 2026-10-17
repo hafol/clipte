@@ -2,13 +2,14 @@
 import { EmptyClips } from '@/components/illustrations';
 
 import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ExternalLink, Trash2 } from '@/components/icons';
+import { Trash2 } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile } from '@/lib/supabase/hooks';
-import { useMyClips, withdrawClip, errText, type ClipRow } from '@/lib/supabase/data';
+import { useMyClips, useClipDeltas, withdrawClip, errText, type ClipRow } from '@/lib/supabase/data';
+import ClipDetail from '@/components/dashboard/ClipDetail';
+import { Sparkline } from '@/components/dashboard/charts';
 import { NotchButton } from '@/components/pi';
-import { PageHeader, StatStrip, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, usd, compact, CLIP_TONE } from '@/components/dashboard/ui';
+import { PageHeader, StatStrip, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, money, compact, CLIP_TONE } from '@/components/dashboard/ui';
 import { Btn, Modal, Notice, Tabs, timeAgo, useToast } from '@/components/dashboard/forms';
 
 type Filter = 'all' | 'hold' | 'verified' | 'problem';
@@ -28,6 +29,9 @@ export default function MyClipsPage() {
   const { toast, toastNode } = useToast();
   const [filter, setFilter] = useState<Filter>('all');
   const [confirm, setConfirm] = useState<ClipRow | null>(null);
+  const [open, setOpen] = useState<ClipRow | null>(null);
+  const ids = useMemo(() => clips.map((k) => k.id), [clips]);
+  const { data: deltas } = useClipDeltas(ids);
   const [busy, setBusy] = useState(false);
 
   const totals = useMemo(
@@ -76,7 +80,7 @@ export default function MyClipsPage() {
         loading={loading}
         items={[
           { label: t('overview.c.views'), value: compact(totals.views), hint: t('overview.c.viewsHint').replace('{n}', String(clips.length)) },
-          { label: t('clips.earned'), value: usd(totals.earned), hint: t('clips.earnedHint') },
+          { label: t('clips.earned'), value: money(totals.earned), hint: t('clips.earnedHint') },
           { label: t('dash.clipStatus.tracking_hold'), value: String(totals.hold), hint: t('clips.holdHint') },
           { label: t('dash.clipStatus.verified'), value: String(totals.verified), hint: t('clips.verifiedHint') },
         ]}
@@ -113,8 +117,9 @@ export default function MyClipsPage() {
       ) : (
         <div>
           {/* header row (desktop) */}
-          <div className="hidden grid-cols-[minmax(0,1fr)_100px_100px_120px_40px] gap-4 border-b border-[var(--pi-line)] pb-2 text-xs text-[var(--pi-muted)] md:grid!">
+          <div className="hidden grid-cols-[minmax(0,1fr)_90px_100px_100px_120px_40px] gap-4 border-b border-[var(--pi-line)] pb-2 text-xs text-[var(--pi-muted)] md:grid!">
             <span>{t('clips.colClip')}</span>
+            <span>{t('clips.colTrend')}</span>
             <span className="text-right">{t('clips.colViews')}</span>
             <span className="text-right">{t('clips.colEarned')}</span>
             <span>{t('clips.colStatus')}</span>
@@ -122,26 +127,27 @@ export default function MyClipsPage() {
           </div>
           <ul className="divide-y divide-[var(--pi-line)]">
             {list.map((k) => (
-              <li key={k.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-4 md:grid-cols-[minmax(0,1fr)_100px_100px_120px_40px]!">
-                <div className="flex min-w-0 items-center gap-3">
+              <li key={k.id} className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-4 md:grid-cols-[minmax(0,1fr)_90px_100px_100px_120px_40px]!">
+                <button type="button" onClick={() => setOpen(k)} className="flex min-w-0 items-center gap-3 text-left cursor-pointer">
                   <span className="pi-notch flex size-9 shrink-0 items-center justify-center bg-[var(--pi-line)] text-[var(--pi-ink-strong)]">
                     <PlatformIcon platform={k.platform} />
                   </span>
                   <div className="min-w-0">
-                    <Link href={`/dashboard/campaigns/${k.campaign_id}`} className="block truncate text-sm text-[var(--pi-ink-strong)] hover:underline">
-                      {k.campaign?.title || '—'}
-                    </Link>
+                    <span className="block truncate text-sm text-[var(--pi-ink-strong)] group-hover:underline">{k.campaign?.title || '—'}</span>
                     <span className="flex min-w-0 items-center gap-1.5 text-xs text-[var(--pi-muted)]">
                       {k.account?.handle && <span className="shrink-0">@{k.account.handle} ·</span>}
-                      <a href={k.video_url} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center gap-1 hover:text-[var(--pi-ink-strong)]">
-                        <span className="truncate">{timeAgo(k.created_at, lang)}</span>
-                        <ExternalLink className="size-3 shrink-0" />
-                      </a>
+                      <span className="truncate">{timeAgo(k.created_at, lang)}</span>
                     </span>
                   </div>
-                </div>
-                <span className="text-right text-sm tabular-nums text-[var(--pi-ink-strong)] max-md:hidden">{compact(k.view_count)}</span>
-                <span className="text-right text-sm tabular-nums text-[var(--pi-ink-strong)] max-md:hidden">{usd(k.earnings)}</span>
+                </button>
+                <span className="flex items-center max-md:hidden">
+                  <Sparkline values={deltas[k.id]?.series || []} />
+                </span>
+                <span className="text-right text-sm tabular-nums text-[var(--pi-ink-strong)] max-md:hidden">
+                  {compact(k.view_count)}
+                  {(deltas[k.id]?.day || 0) > 0 && <span className="block text-[11px] text-emerald-600 dark:text-emerald-400!">+{compact(deltas[k.id].day)} {t('clips.today')}</span>}
+                </span>
+                <span className="text-right text-sm tabular-nums text-[var(--pi-ink-strong)] max-md:hidden">{money(k.earnings)}</span>
                 <div className="flex flex-col items-end gap-1 md:items-start!">
                   <Chip tone={CLIP_TONE[k.status]}>{t(`dash.clipStatus.${k.status}`)}</Chip>
                   <span className="text-[11px] text-[var(--pi-muted)]">
@@ -154,8 +160,9 @@ export default function MyClipsPage() {
                 <div className="col-span-2 flex gap-5 pl-12 text-xs tabular-nums text-[var(--pi-muted)] md:hidden!">
                   <span>
                     <span className="text-[var(--pi-ink-strong)]">{compact(k.view_count)}</span> {t('common.views')}
+                    {(deltas[k.id]?.day || 0) > 0 && <span className="text-emerald-600 dark:text-emerald-400!"> +{compact(deltas[k.id].day)}</span>}
                   </span>
-                  <span className="text-[var(--pi-ink-strong)]">{usd(k.earnings)}</span>
+                  <span className="text-[var(--pi-ink-strong)]">{money(k.earnings)}</span>
                   {k.status === 'tracking_hold' && (
                     <button type="button" onClick={() => setConfirm(k)} className="ml-auto text-rose-600 cursor-pointer">
                       {t('clips.withdraw')}
@@ -188,6 +195,15 @@ export default function MyClipsPage() {
           </p>
         ))}
       </div>
+
+      <ClipDetail
+        clip={open}
+        onClose={() => setOpen(null)}
+        onWithdraw={(c) => {
+          setOpen(null);
+          setConfirm(c);
+        }}
+      />
 
       <Modal open={!!confirm} onClose={() => setConfirm(null)} title={t('clips.withdrawTitle')}>
         <div className="space-y-5">

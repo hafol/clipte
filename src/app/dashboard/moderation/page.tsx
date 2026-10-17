@@ -10,7 +10,7 @@ import {
   useStaffQueue, approveCampaign, rejectCampaign, moderateClip, recordViews, staffVerifyAccount, errText, topCpm, PLATFORM_NAME,
   type CampaignRow, type ClipRow,
 } from '@/lib/supabase/data';
-import { PageHeader, StatStrip, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, usd, compact, CLIP_TONE, CAMPAIGN_TONE } from '@/components/dashboard/ui';
+import { PageHeader, StatStrip, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, money, compact, CLIP_TONE, CAMPAIGN_TONE } from '@/components/dashboard/ui';
 import { Btn, Field, Modal, Notice, Segmented, Tabs, boxInputCls, inputCls, timeAgo, useToast } from '@/components/dashboard/forms';
 import { CampaignCover, PlatformList } from '@/components/dashboard/campaign';
 
@@ -114,10 +114,10 @@ export default function ModerationPage() {
                     <p className="line-clamp-3 text-sm font-light text-[var(--pi-ink)]">{c.description || c.guidelines || '—'}</p>
                     <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-[var(--pi-muted)]">
                       <span>
-                        {t('mod.funded')}: <span className="tabular-nums text-[var(--pi-ink-strong)]">{usd(c.escrow_budget)}</span>
+                        {t('mod.funded')}: <span className="tabular-nums text-[var(--pi-ink-strong)]">{money(c.escrow_budget)}</span>
                       </span>
                       <span>
-                        {t('create.cpm')}: <span className="tabular-nums text-[var(--pi-ink-strong)]">{usd(topCpm(c))}</span>
+                        {t('create.cpm')}: <span className="tabular-nums text-[var(--pi-ink-strong)]">{money(topCpm(c))}</span>
                       </span>
                       <PlatformList platforms={c.platforms} className="size-3.5" />
                       <a href={c.drive_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-4">
@@ -152,7 +152,7 @@ export default function ModerationPage() {
                       {c.title} <span className="text-[var(--pi-muted)]">· {c.brand_name}</span>
                     </Link>
                     <span className="text-xs tabular-nums text-[var(--pi-muted)]">
-                      {usd(c.remaining_budget, 0)} / {usd(c.escrow_budget, 0)}
+                      {money(c.remaining_budget, 0)} / {money(c.escrow_budget, 0)}
                     </span>
                     <Chip tone={CAMPAIGN_TONE[c.status]}>{t(`dash.campaignStatus.${c.status}`)}</Chip>
                     <Btn size="sm" variant="ghost" onClick={() => setRejecting(c)}>
@@ -310,7 +310,7 @@ function RejectCampaign({ c, onClose, t, onConfirm }: { c: CampaignRow | null; o
         <Field label={t('mod.note')}>
           <textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} className={boxInputCls} maxLength={400} />
         </Field>
-        <Notice tone="amber">{t('mod.refundNote').replace('{n}', usd(c.remaining_budget))}</Notice>
+        <Notice tone="amber">{t('mod.refundNote').replace('{n}', money(c.remaining_budget))}</Notice>
         <div className="flex justify-end gap-2">
           <Btn variant="ghost" onClick={onClose}>
             {t('common.cancel')}

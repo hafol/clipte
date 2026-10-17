@@ -764,7 +764,10 @@
     "loading": "Loading your studio…",
     "roleAdmin": "Admin",
     "roleModerator": "Moderator",
-    "noNotifications": "No notifications yet"
+    "noNotifications": "No notifications yet",
+    "fxTip": "1 $ = {rate} ₸ · {source}. Payments are always made in USD.",
+    "fxNbk": "National Bank of Kazakhstan",
+    "currency": "Currency"
   },
   "dash": {
     "clipStatus": {
@@ -889,7 +892,13 @@
     "clear": "Clear",
     "seeAll": "See all",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "save": "Save campaign",
+    "unsave": "Remove from saved",
+    "saved": "Saved",
+    "removed": "Removed from saved",
+    "savedFilter": "Saved",
+    "rowSaved": "Saved for later"
   },
   "camp": {
     "back": "All campaigns",
@@ -958,7 +967,14 @@
     "notYetLive": "This campaign is being reviewed and will open for clips once it’s approved.",
     "ownOnly": "Only videos posted from your verified account are accepted.",
     "notOwner": "This video was posted by {owner}, not by your verified account. You can only submit videos from your own accounts.",
-    "ownerPending": "We couldn't confirm automatically that this video is yours. A moderator will check it before it gets paid — no action needed."
+    "ownerPending": "We couldn't confirm automatically that this video is yours. A moderator will check it before it gets paid — no action needed.",
+    "tabStats": "Stats",
+    "pvDuplicate": "This video was already submitted",
+    "pvMine": "Posted by {owner} — your account",
+    "pvNotMine": "Posted by {owner}, not by {mine}. Only your own videos are accepted.",
+    "pvUnknown": "Couldn't confirm the uploader — a moderator will check before payout",
+    "pvEstimate": "Could earn:",
+    "pvChecking": "Checking video…"
   },
   "fund": {
     "title": "Fund campaign",
@@ -973,7 +989,8 @@
     "openBot": "Pay in Telegram",
     "openWeb": "Open web app",
     "newInvoice": "New invoice",
-    "paid": "Payment received. The campaign goes to review."
+    "paid": "Payment received. The campaign goes to review.",
+    "inUsd": "charged in USD"
   },
   "create": {
     "title": "New campaign",
@@ -1059,7 +1076,9 @@
     "rule1": "Views are read from the platform automatically. TikTok and Instagram views may be confirmed by our team from your analytics.",
     "rule2": "Every clip waits 48 hours before it can earn, so we can spot fake views.",
     "rule3": "Clips with bought views are rejected and stop earning.",
-    "colViews": "Views"
+    "colViews": "Views",
+    "colTrend": "Trend",
+    "today": "today"
   },
   "acc": {
     "title": "Accounts & profile",
@@ -1385,5 +1404,94 @@
     "by_admin": "Manual",
     "line": "{checked} checked · {recorded} recorded · {unavailable} unreadable · {flagged} flagged · {settled} paid",
     "errors": "{n} errors"
+  },
+  "stats": {
+    "views": "Views",
+    "earned": "Earned",
+    "spent": "Spent",
+    "clips": "Clips",
+    "submitted": "Clips submitted",
+    "received": "Clips received",
+    "performance": "Performance",
+    "days": "{n}d",
+    "empty": "No activity in this period yet",
+    "before": "prev.",
+    "new": "new"
+  },
+  "cd": {
+    "title": "Clip",
+    "dh": "{d}d {h}h",
+    "h": "{h}h",
+    "submitted": "Submitted",
+    "tracking": "Views tracked",
+    "lastCheck": "last check {t}",
+    "nextCheck": "next in ~{t}",
+    "firstCheck": "First reading within a few hours",
+    "problemDesc": "A moderator is looking at this clip.",
+    "hold": "Fraud hold",
+    "holdLeft": "Ends in {t}",
+    "holdDone": "Hold finished",
+    "paid": "Paid to your balance",
+    "paidDesc": "{n} credited so far — more as views grow",
+    "belowMin": "Not yet at the minimum payout — keep it growing",
+    "paidLater": "Paid automatically when the hold ends",
+    "openVideo": "Open video",
+    "today": "+{n} in 24h",
+    "noneToday": "no new views in 24h",
+    "perK": "Per 1K views",
+    "perKHint": "what you actually earned",
+    "growth": "Views over time",
+    "notEnough": "The chart appears after the second reading.",
+    "openCampaign": "Open campaign"
+  },
+  "cs": {
+    "colDate": "Date",
+    "colPlatform": "Platform",
+    "colHandle": "Account",
+    "colUrl": "Link",
+    "colStatus": "Status",
+    "colViews": "Views",
+    "colEarned": "Paid",
+    "views": "Views delivered",
+    "viewsHint": "{n} paid views",
+    "cpm": "Real cost per 1K",
+    "cpmHint": "spent ÷ paid views",
+    "runway": "Budget runway",
+    "days": "~{n} days",
+    "runwayHint": "at {n}/day (last 7 days)",
+    "runwayNone": "no spend in the last 7 days",
+    "clips": "Clips",
+    "clipsHint": "{ok} paid · {hold} on hold · {bad} flagged",
+    "burn": "Budget used",
+    "platforms": "Views by platform",
+    "topClippers": "Top clippers",
+    "topClips": "Top clips",
+    "export": "Export CSV"
+  },
+  "ps": {
+    "tab": "Analytics",
+    "funded": "Funded",
+    "fundedHint": "{n} all time",
+    "earned": "Paid to clippers",
+    "earnedHint": "{n} all time",
+    "escrow": "In escrow",
+    "escrowHint": "unspent live budgets",
+    "pending": "Payouts to send",
+    "pendingHint": "{n} sent all time",
+    "users": "Users",
+    "usersHint": "+{n} in period",
+    "clippers": "Active clippers",
+    "clippersHint": "submitted in period",
+    "campaigns": "Live campaigns",
+    "campaignsHint": "{n} paying brands",
+    "clips": "Clips in period",
+    "clipsHint": "{views} views · {flag} flagged",
+    "needMigration": "Run supabase/migrations/2026-10-18_v2_8.sql to turn on analytics.",
+    "period": "Last {n} days",
+    "signups": "Sign-ups",
+    "signupsN": "{n} sign-ups",
+    "fundingChart": "Brand deposits",
+    "topCampaigns": "Top campaigns",
+    "topClippers": "Top earners"
   }
 }

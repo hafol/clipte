@@ -1,7 +1,7 @@
 'use client';
 import { EmptyClips, NotFound, Success } from '@/components/illustrations';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Check, ExternalLink, FolderOpen, Link2, Minus, Pause, Pencil, Play, ShieldAlert, Users } from '@/components/icons';
@@ -11,17 +11,18 @@ import { useMessenger } from '@/lib/supabase/messenger';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile } from '@/lib/supabase/hooks';
 import {
-  useCampaignDetail, submitClip, updateCampaign, approveCampaign, errText, PLATFORM_NAME, topCpm,
-  type CampaignRow, type ClipRow, type Platform, type SocialAccountRow,
+  useCampaignDetail, submitClip, previewClip, updateCampaign, approveCampaign, errText, PLATFORM_NAME, topCpm, rateFor,
+  type CampaignRow, type ClipRow, type ClipPreview, type Platform, type SocialAccountRow,
 } from '@/lib/supabase/data';
 import {
-  StatStrip, Section, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, Label, usd, compact, CLIP_TONE, CAMPAIGN_TONE,
+  StatStrip, Section, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, Label, money, compact, CLIP_TONE, CAMPAIGN_TONE,
 } from '@/components/dashboard/ui';
 import { Btn, CopyButton, Field, Modal, Notice, Tabs, boxInputCls, inputCls, timeAgo, useToast } from '@/components/dashboard/forms';
 import { CampaignCover, FundPanel, PlatformList, RateTable } from '@/components/dashboard/campaign';
+import CampaignStats from '@/components/dashboard/CampaignStats';
 
 type T = (k: string) => string;
-type Tab = 'brief' | 'leaders' | 'mine' | 'subs' | 'deposits';
+type Tab = 'stats' | 'brief' | 'leaders' | 'mine' | 'subs' | 'deposits';
 
 const detectPlatform = (url: string): Platform | null => {
   const u = url.toLowerCase();
@@ -56,6 +57,13 @@ export default function CampaignDetailPage() {
   const c = data.campaign;
   const isOwner = !!c && c.brand_id === profile?.id;
   const isStaff = profile?.role === 'moderator' || profile?.role === 'admin';
+  // owners land on their stats once the campaign is funded
+  const tabPicked = useRef(false);
+  useEffect(() => {
+    if (tabPicked.current || !c) return;
+    tabPicked.current = true;
+    if (isOwner && c.status !== 'pending_payment') setTab('stats');
+  }, [c, isOwner]);
   const clipperTotals = useMemo(
     () => ({ clippers: data.leaderboard.length, clips: data.leaderboard.reduce((a, r) => a + r.clips, 0) }),
     [data.leaderboard]
@@ -110,7 +118,9 @@ export default function CampaignDetailPage() {
     }
   };
 
+  const canSeeStats = (isOwner || isStaff) && c.status !== 'pending_payment';
   const tabs: { id: Tab; label: string; count?: number }[] = [
+    ...(canSeeStats ? [{ id: 'stats' as Tab, label: t('camp.tabStats') }] : []),
     { id: 'brief', label: t('camp.tabBrief') },
     { id: 'leaders', label: t('camp.tabLeaders'), count: data.leaderboard.length },
     ...(!isOwner ? [{ id: 'mine' as Tab, label: t('camp.tabMine'), count: data.myClips.length }] : []),
@@ -222,7 +232,7 @@ export default function CampaignDetailPage() {
           {t('camp.rejected')}: {c.rejection_reason}
         </Notice>
       )}
-      {canReview && <Notice tone="blue">{t('camp.staffReview').replace('{n}', usd(c.escrow_budget))}</Notice>}
+      {canReview && <Notice tone="blue">{t('camp.staffReview').replace('{n}', money(c.escrow_budget))}</Notice>}
       {!isOwner && !canReview && c.status !== 'active' && <Notice>{c.status === 'pending_review' ? t('camp.notYetLive') : t('camp.notOpen')}</Notice>}
 
       {/* ---------- budget band (card language from Discover) ---------- */}
@@ -231,11 +241,11 @@ export default function CampaignDetailPage() {
           <div className="space-y-3">
             <div className="flex items-baseline justify-between gap-4">
               <span className="text-[13px] text-[var(--pi-muted)]">{t('camp.budgetLeft')}</span>
-              <span className="text-xs tabular-nums text-[var(--pi-muted)]">{t('camp.paidOut')}: {usd(spent, 0)}</span>
+              <span className="text-xs tabular-nums text-[var(--pi-muted)]">{t('camp.paidOut')}: {money(spent, 0)}</span>
             </div>
             <p className="text-[clamp(2rem,4vw,3rem)] font-light leading-none tracking-[-0.05em] tabular-nums text-[var(--pi-ink-strong)]">
-              {usd(c.remaining_budget, 0)}
-              <span className="text-[0.45em] tracking-normal text-[var(--pi-muted)]"> / {usd(c.escrow_budget, 0)}</span>
+              {money(c.remaining_budget, 0)}
+              <span className="text-[0.45em] tracking-normal text-[var(--pi-muted)]"> / {money(c.escrow_budget, 0)}</span>
             </p>
             <div className="relative h-1.5 w-full overflow-hidden rounded-full">
               <div className="cr-track absolute inset-0" />
@@ -266,7 +276,7 @@ export default function CampaignDetailPage() {
               {compact(c.views_delivered)} {t('common.views')}
             </span>
             <span className="cr-pill-blue relative flex h-9 items-center rounded-full px-3 text-[13px] font-semibold">
-              <span className="text-blue-500 dark:text-[#89B6FF]!">{usd(topCpm(c))}</span>
+              <span className="text-blue-500 dark:text-[#89B6FF]!">{money(topCpm(c))}</span>
               <span className="text-blue-500/70 dark:text-[rgba(137,182,255,0.7)]!">/1K</span>
             </span>
           </div>
@@ -275,6 +285,7 @@ export default function CampaignDetailPage() {
 
       <Tabs value={tab} onChange={setTab} items={tabs} />
 
+      {tab === 'stats' && canSeeStats && <CampaignStats c={c} clips={data.clips} />}
       {tab === 'brief' && <Brief c={c} t={t} />}
       {tab === 'leaders' && <Leaders rows={data.leaderboard} me={profile.id} t={t} />}
       {tab === 'mine' && <ClipList clips={data.myClips} t={t} lang={lang} empty={t('camp.noMine')} />}
@@ -291,7 +302,7 @@ export default function CampaignDetailPage() {
                     #{d.invoice_id} · {timeAgo(d.created_at, lang)}
                   </span>
                   <span className="flex items-center gap-3">
-                    <span className="tabular-nums text-[var(--pi-ink-strong)]">{usd(d.amount)}</span>
+                    <span className="tabular-nums text-[var(--pi-ink-strong)]">{money(d.amount)}</span>
                     <Chip tone={d.status === 'paid' ? 'green' : d.status === 'pending' ? 'amber' : 'muted'}>{t(`pay.dep.${d.status}`)}</Chip>
                   </span>
                 </li>
@@ -462,7 +473,7 @@ function Leaders({ rows, me, t }: { rows: { user_id: string; name: string; avata
             {r.clips} {t('common.clips')}
           </span>
           <span className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink-strong)]">{compact(r.views)}</span>
-          <span className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink)]">{usd(r.earnings)}</span>
+          <span className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink)]">{money(r.earnings)}</span>
         </li>
       ))}
     </ol>
@@ -489,7 +500,7 @@ function ClipList({ clips, t, lang, empty, showHandle }: { clips: ClipRow[]; t: 
             </span>
           </div>
           <span className="hidden w-20 text-right text-sm tabular-nums text-[var(--pi-ink-strong)] sm:block!">{compact(k.view_count)}</span>
-          <span className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink)]">{usd(k.earnings)}</span>
+          <span className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink)]">{money(k.earnings)}</span>
           <Chip tone={CLIP_TONE[k.status]}>{t(`dash.clipStatus.${k.status}`)}</Chip>
         </li>
       ))}
@@ -519,11 +530,33 @@ function SubmitModal({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [pendingOwner, setPendingOwner] = useState(false);
+  const [preview, setPreview] = useState<ClipPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const platform = detectPlatform(url);
   const allowed = platform ? c.platforms.includes(platform) : false;
   const verified = platform ? accounts.some((a) => a.platform === platform && a.verified_at) : false;
-  const ready = !!platform && allowed && verified;
+  const blocked = !!preview && (preview.ownership === 'mismatch' || !!preview.duplicate);
+  const ready = !!platform && allowed && verified && !blocked;
+
+  // look the video up half a second after the link stops changing
+  useEffect(() => {
+    setPreview(null);
+    if (!platform || !allowed || !verified) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      setPreviewing(true);
+      previewClip(url.trim(), c.id, ctrl.signal)
+        .then((p) => !ctrl.signal.aborted && setPreview(p.ok ? p : null))
+        .catch(() => {})
+        .finally(() => !ctrl.signal.aborted && setPreviewing(false));
+    }, 500);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+      setPreviewing(false);
+    };
+  }, [url, platform, allowed, verified, c.id]);
 
   const close = () => {
     onClose();
@@ -532,6 +565,7 @@ function SubmitModal({
       setError(null);
       setDone(false);
       setPendingOwner(false);
+      setPreview(null);
     }, 200);
   };
 
@@ -592,9 +626,10 @@ function SubmitModal({
               </Link>
             </Notice>
           )}
-          {ready && (
+          {platform && allowed && verified && (previewing || preview) && <PreviewCard p={preview} loading={previewing && !preview} c={c} platform={platform} t={t} />}
+          {platform && allowed && verified && !previewing && !preview && (
             <p className="flex items-center gap-2 text-sm text-[var(--pi-ink-strong)]">
-              <PlatformIcon platform={platform!} /> {t('camp.detected').replace('{p}', PLATFORM_NAME[platform!])}
+              <PlatformIcon platform={platform} /> {t('camp.detected').replace('{p}', PLATFORM_NAME[platform])}
             </p>
           )}
           {error && <Notice tone="red">{error}</Notice>}
@@ -603,12 +638,68 @@ function SubmitModal({
             <span>{t('camp.holdNote')}</span>
             <PlatformList platforms={c.platforms} className="size-3.5" />
           </div>
-          <Btn type="submit" size="lg" className="w-full" disabled={!ready} loading={busy}>
-            {t('camp.submitCta')}
+          <Btn type="submit" size="lg" className="w-full" disabled={!ready || previewing} loading={busy}>
+            {previewing ? t('camp.pvChecking') : t('camp.submitCta')}
           </Btn>
         </form>
       )}
     </Modal>
+  );
+}
+
+/** What the clipper is about to submit: thumbnail, title, who posted it, and what it could earn. */
+function PreviewCard({ p, loading, c, platform, t }: { p: ClipPreview | null; loading: boolean; c: CampaignRow; platform: Platform; t: T }) {
+  const rate = rateFor(c, platform);
+  const est = (views: number) => {
+    let v = (views / 1000) * rate.cpm;
+    if (rate.maxCap) v = Math.min(v, rate.maxCap);
+    return money(v, 0);
+  };
+  if (loading || !p) {
+    return (
+      <div className="cr-preview flex gap-3 overflow-hidden rounded-xl bg-[var(--pi-bg)] p-2.5">
+        <span className="aspect-video w-36 shrink-0 animate-pulse rounded-lg bg-[var(--pi-line)]" />
+        <span className="flex-1 space-y-2 py-1">
+          <span className="block h-3 w-4/5 animate-pulse rounded bg-[var(--pi-line)]" />
+          <span className="block h-3 w-1/2 animate-pulse rounded bg-[var(--pi-line)]" />
+          <span className="block h-3 w-2/3 animate-pulse rounded bg-[var(--pi-line)]" />
+        </span>
+      </div>
+    );
+  }
+  const owner =
+    p.duplicate ? { tone: 'text-rose-600 dark:text-rose-400!', icon: '✕', text: t('camp.pvDuplicate') }
+    : p.ownership === 'matched' ? { tone: 'text-emerald-700 dark:text-emerald-400!', icon: '✓', text: t('camp.pvMine').replace('{owner}', p.author || '') }
+    : p.ownership === 'mismatch' ? { tone: 'text-rose-600 dark:text-rose-400!', icon: '✕', text: t('camp.pvNotMine').replace('{owner}', p.author || '').replace('{mine}', (p.accounts || []).join(', ')) }
+    : { tone: 'text-amber-700 dark:text-amber-300!', icon: '?', text: t('camp.pvUnknown') };
+  return (
+    <div className="cr-preview overflow-hidden rounded-xl bg-[var(--pi-bg)]">
+      <div className="flex gap-3 p-2.5">
+        <span className="relative aspect-video w-36 shrink-0 overflow-hidden rounded-lg bg-[var(--pi-line)]">
+          {p.thumbnail && <img src={p.thumbnail} alt="" referrerPolicy="no-referrer" className="size-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+          <span className="absolute bottom-1 left-1 flex size-5 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur">
+            <PlatformIcon platform={platform} className="size-3" />
+          </span>
+        </span>
+        <div className="min-w-0 flex-1 py-0.5">
+          <p className="line-clamp-2 text-[13px] leading-snug text-[var(--pi-ink-strong)]">{p.title || PLATFORM_NAME[platform]}</p>
+          <p className={`mt-1.5 flex items-start gap-1 text-[12px] font-medium ${owner.tone}`}>
+            <span aria-hidden>{owner.icon}</span>
+            <span className="min-w-0">{owner.text}</span>
+          </p>
+        </div>
+      </div>
+      {!p.duplicate && p.ownership !== 'mismatch' && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--pi-line)] px-3 py-2 text-[12px] text-[var(--pi-muted)]">
+          <span>{t('camp.pvEstimate')}</span>
+          {[10_000, 100_000, 1_000_000].map((v) => (
+            <span key={v} className="tabular-nums">
+              <span className="text-[var(--pi-ink)]">{compact(v)}</span> → <span className="text-[var(--pi-ink-strong)]">{est(v)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

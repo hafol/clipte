@@ -6,8 +6,8 @@ import type { Platform } from '@/lib/supabase/data';
 
 // Small building blocks shared by dashboard pages (landing design system, app-tuned).
 
-export const usd = (n: number, digits = 2) =>
-  `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+// money() shows the viewer's display currency ($ or ₸); usd() is always dollars (charges, payouts)
+export { usd, money, moneyAlt, kzt } from '@/lib/money';
 
 export const compact = (n: number) =>
   (Number(n) || 0) >= 10000

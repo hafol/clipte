@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile } from '@/lib/supabase/hooks';
 import { useAdminData, useTracking, runTrackingNow, processPayout, errText, METHOD_NAME, type PayoutRow, type TrackingRun } from '@/lib/supabase/data';
-import { PageHeader, StatStrip, Section, Chip, EmptyState, ErrorNote, SkeletonRows, usd, compact, CAMPAIGN_TONE } from '@/components/dashboard/ui';
+import { PageHeader, StatStrip, Section, Chip, EmptyState, ErrorNote, SkeletonRows, money, compact, CAMPAIGN_TONE } from '@/components/dashboard/ui';
 import { Btn, CopyButton, Field, Modal, Notice, Tabs, inputCls, timeAgo, useToast } from '@/components/dashboard/forms';
+import PlatformStats from '@/components/dashboard/PlatformStats';
 
 type T = (k: string) => string;
-type Tab = 'payouts' | 'campaigns' | 'tracking';
+type Tab = 'analytics' | 'payouts' | 'campaigns' | 'tracking';
 
 export default function AdminPage() {
   const { t, lang } = useLanguage();
@@ -18,7 +19,7 @@ export default function AdminPage() {
   const isAdmin = profile?.role === 'admin';
   const { data, loading, error, refresh } = useAdminData(!!isAdmin);
   const { toast, toastNode } = useToast();
-  const [tab, setTab] = useState<Tab>('payouts');
+  const [tab, setTab] = useState<Tab>('analytics');
   const [acting, setActing] = useState<{ p: PayoutRow; kind: 'completed' | 'failed' } | null>(null);
 
   if (!profile) return null;
@@ -38,8 +39,8 @@ export default function AdminPage() {
         items={[
           { label: t('adm.users'), value: compact(data.users), hint: t('adm.usersHint') },
           { label: t('overview.b.live'), value: String(live.length), hint: t('overview.b.liveHint').replace('{n}', String(data.campaigns.length)) },
-          { label: t('adm.escrow'), value: usd(escrow, 0), hint: t('adm.escrowHint') },
-          { label: t('adm.queue'), value: usd(queue.reduce((a, p) => a + p.amount, 0)), hint: t('adm.queueHint').replace('{n}', String(queue.length)) },
+          { label: t('adm.escrow'), value: money(escrow, 0), hint: t('adm.escrowHint') },
+          { label: t('adm.queue'), value: money(queue.reduce((a, p) => a + p.amount, 0)), hint: t('adm.queueHint').replace('{n}', String(queue.length)) },
         ]}
       />
 
@@ -47,6 +48,7 @@ export default function AdminPage() {
         value={tab}
         onChange={setTab}
         items={[
+          { id: 'analytics', label: t('ps.tab') },
           { id: 'payouts', label: t('adm.tabPayouts'), count: queue.length },
           { id: 'campaigns', label: t('adm.tabCampaigns'), count: data.campaigns.length },
           { id: 'tracking', label: t('trk.tab') },
@@ -54,7 +56,7 @@ export default function AdminPage() {
       />
 
       {error && <ErrorNote message={error} onRetry={refresh} retryLabel={t('overview.retry')} />}
-      {loading && <SkeletonRows rows={4} />}
+      {loading && (tab === 'payouts' || tab === 'campaigns') && <SkeletonRows rows={4} />}
 
       {!loading && tab === 'payouts' && (
         <div className="space-y-10">
@@ -67,7 +69,7 @@ export default function AdminPage() {
                   <li key={p.id} className="flex flex-wrap items-center gap-4 py-4">
                     <div className="min-w-0 flex-1">
                       <span className="block text-sm text-[var(--pi-ink-strong)]">
-                        {usd(p.amount)} · {METHOD_NAME[p.method_type] || p.method_type}
+                        {money(p.amount)} · {METHOD_NAME[p.method_type] || p.method_type}
                       </span>
                       <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-[var(--pi-muted)]">
                         <code className="truncate">{p.recipient}</code>
@@ -101,7 +103,7 @@ export default function AdminPage() {
                         {METHOD_NAME[p.method_type] || p.method_type} · <code className="text-xs">{p.recipient}</code>
                         <span className="text-xs text-[var(--pi-muted)]"> · {p.transaction_reference || p.failure_reason || ''}</span>
                       </span>
-                      <span className="tabular-nums text-[var(--pi-ink-strong)]">{usd(p.amount)}</span>
+                      <span className="tabular-nums text-[var(--pi-ink-strong)]">{money(p.amount)}</span>
                       <Chip tone={p.status === 'completed' ? 'green' : 'red'}>{t(`pay.st.${p.status}`)}</Chip>
                     </li>
                   ))}
@@ -119,7 +121,7 @@ export default function AdminPage() {
                 {c.title} <span className="text-[var(--pi-muted)]">· {c.brand_name}</span>
               </Link>
               <span className="text-xs tabular-nums text-[var(--pi-muted)]">
-                {compact(c.views_delivered)} {t('common.views')} · {usd(c.remaining_budget, 0)} / {usd(c.escrow_budget, 0)}
+                {compact(c.views_delivered)} {t('common.views')} · {money(c.remaining_budget, 0)} / {money(c.escrow_budget, 0)}
               </span>
               <Chip tone={CAMPAIGN_TONE[c.status]}>{t(`dash.campaignStatus.${c.status}`)}</Chip>
             </li>
@@ -127,6 +129,7 @@ export default function AdminPage() {
         </ul>
       )}
 
+      {tab === 'analytics' && <PlatformStats />}
       {tab === 'tracking' && <TrackingPanel t={t} lang={lang} toast={toast} />}
 
       <Notice>{t('adm.rolesNote')}</Notice>
@@ -169,7 +172,7 @@ function PayoutDialog({
     <Modal open onClose={onClose} title={sent ? t('adm.markSent') : t('adm.markFailed')}>
       <div className="space-y-5">
         <p className="text-sm text-[var(--pi-ink)]">
-          {usd(action.p.amount)} → <code className="text-xs">{action.p.recipient}</code>
+          {money(action.p.amount)} → <code className="text-xs">{action.p.recipient}</code>
         </p>
         <Field label={sent ? t('adm.txRef') : t('adm.failReason')} hint={sent ? t('adm.txHint') : t('adm.failHint')}>
           <input autoFocus value={value} onChange={(e) => setValue(e.target.value)} maxLength={200} className={inputCls} />
@@ -279,7 +282,7 @@ function TrackingPanel({ t, lang, toast }: { t: T; lang: string; toast: (msg: st
                     .replace('{settled}', String(r.settled))}
                   {r.errors.length > 0 && <span className="text-rose-600"> · {t('trk.errors').replace('{n}', String(r.errors.length))}</span>}
                 </span>
-                <span className="tabular-nums text-[var(--pi-ink-strong)]">{usd(r.paid)}</span>
+                <span className="tabular-nums text-[var(--pi-ink-strong)]">{money(r.paid)}</span>
               </li>
             ))}
           </ul>

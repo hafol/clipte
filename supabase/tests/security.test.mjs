@@ -228,5 +228,27 @@ await expectOk('clippers cannot read the log', 'clipper', `select count(*)::int 
 await expectOk('anon cannot read the log', 'anon', `select count(*)::int n from public.tracking_runs`, [], (r) => r[0].n === 0);
 await expectFail('users cannot write the log', 'clipper', `insert into public.tracking_runs (trigger) values ('fake')`);
 
+console.log('\nStats & saved campaigns');
+await expectOk('settlements were written to the ledger', 'service', `select count(*)::int n, sum(amount)::float s from public.clip_earnings where clip_id = $1`, [clip.id], (r) => r[0].n >= 2 && r[0].s > 0);
+await expectOk('clipper sees own ledger', 'clipper', `select count(*)::int n from public.clip_earnings`, [], (r) => r[0].n >= 2);
+await expectOk('campaign brand sees the ledger', 'brand', `select count(*)::int n from public.clip_earnings`, [], (r) => r[0].n >= 2);
+await expectOk('outsider sees no ledger', 'newbie', `select count(*)::int n from public.clip_earnings`, [], (r) => r[0].n === 0);
+await expectFail('users cannot write the ledger', 'clipper', `insert into public.clip_earnings (clip_id, user_id, campaign_id, amount) values ($1, $2, $3, 999)`, [clip.id, ids.clipper, camp.id]);
+await expectOk('clipper series: 7 days, views and earnings', 'clipper', `select sum(views)::int v, sum(earned)::float e, count(*)::int d from public.stats_series('me', null, 7)`, [], (r) => r[0].d === 7 && r[0].v > 0 && r[0].e > 0);
+await expectOk('brand series over own campaigns', 'brand', `select sum(views)::int v from public.stats_series('brand', null, 30)`, [], (r) => r[0].v > 0);
+await expectOk('brand series for own campaign', 'brand', `select sum(views)::int v from public.stats_series('campaign', $1, 30)`, [camp.id], (r) => r[0].v > 0);
+await expectFail('outsider cannot read a campaign series', 'newbie', `select * from public.stats_series('campaign', $1, 30)`, [camp.id]);
+await expectFail('clipper cannot read the platform series', 'clipper', `select * from public.stats_series('platform', null, 30)`);
+await expectOk('staff read the platform series', 'mod', `select count(*)::int d from public.stats_series('platform', null, 14, 'Asia/Almaty')`, [], (r) => r[0].d === 14);
+await expectFail('anon cannot read series', 'anon', `select * from public.stats_series('me', null, 7)`);
+await expectOk('brand reads campaign analytics', 'brand', `select public.campaign_analytics($1) a`, [camp.id], (r) => r[0].a.totals.clips >= 1 && r[0].a.clippers.length >= 1);
+await expectFail('clipper cannot read campaign analytics', 'clipper', `select public.campaign_analytics($1)`, [camp.id]);
+await expectOk('admin reads platform analytics', 'admin', `select public.platform_analytics(30) a`, [], (r) => r[0].a.totals.users >= 4 && Array.isArray(r[0].a.top_clippers));
+await expectFail('moderator cannot read platform money', 'mod', `select public.platform_analytics(30)`);
+await expectOk('clipper saves a campaign', 'clipper', `insert into public.saved_campaigns (user_id, campaign_id) values ($1, $2) returning campaign_id`, [ids.clipper, camp.id], (r) => r.length === 1);
+await expectFail('cannot save for someone else', 'clipper', `insert into public.saved_campaigns (user_id, campaign_id) values ($1, $2)`, [ids.brand, camp.id]);
+await expectOk('others cannot see my saved list', 'brand', `select count(*)::int n from public.saved_campaigns`, [], (r) => r[0].n === 0);
+await expectOk('clipper unsaves', 'clipper', `delete from public.saved_campaigns where campaign_id = $1 returning campaign_id`, [camp.id], (r) => r.length === 1);
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

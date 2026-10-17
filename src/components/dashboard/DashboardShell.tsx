@@ -16,10 +16,33 @@ import ThemeToggle from '@/components/ThemeToggle';
 import MessengerDrawer from '@/components/messenger/MessengerDrawer';
 import NotificationsBell from '@/components/dashboard/NotificationsBell';
 import { MessengerProvider, useMessenger } from '@/lib/supabase/messenger';
+import { money } from '@/lib/money';
 
 type NavItem = { label: string; href: string; icon: React.ElementType; exact?: boolean };
 
-const money = (n: number) => `$${(Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** $ / ₸ display switch (payments stay in USD). The tooltip names today's rate and its source. */
+function CurrencySwitch() {
+  const { currency, setCurrency, fx, t } = useLanguage();
+  if (!fx.rate) return null;
+  const tip = t('shell.fxTip').replace('{rate}', fx.rate.toLocaleString('ru-RU', { maximumFractionDigits: 2 })).replace('{source}', fx.source === 'nationalbank.kz' ? t('shell.fxNbk') : fx.source || '');
+  return (
+    <div role="group" aria-label={t('shell.currency')} title={tip} className="pi-notch pi-glass flex h-12 items-center gap-0.5 px-1.5 text-xs text-[var(--pi-ink-strong)]">
+      {(['USD', 'KZT'] as const).map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => setCurrency(c)}
+          aria-pressed={currency === c}
+          className={`h-8 min-w-8 px-2 text-[13px] transition-[opacity,background-color] cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--pi-ink-strong)]/40 ${
+            currency === c ? 'pi-notch pi-glass-chip' : 'opacity-55 hover:opacity-100'
+          }`}
+        >
+          {c === 'USD' ? '$' : '₸'}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Dashboard frame in the landing design system: glass header, hairline sidebar, mobile dock. */
 export default function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -175,6 +198,9 @@ export default function DashboardShell({ children }: { children: React.ReactNode
           <MessagesButton className={`${iconBtn} hidden sm:flex!`} label={t('shell.messages')} />
 
           <div className="hidden md:block!">
+            <CurrencySwitch />
+          </div>
+          <div className="hidden md:block!">
             <LangSwitch />
           </div>
           <div className="hidden md:block!">
@@ -226,7 +252,8 @@ export default function DashboardShell({ children }: { children: React.ReactNode
                   </div>
                 </div>
                 <div className="mt-1 border-t border-[var(--pi-line)] pt-1 md:hidden!">
-                  <div className="flex items-center justify-between gap-2 px-1 py-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-2">
+                    <CurrencySwitch />
                     <LangSwitch />
                     <ThemeToggle />
                   </div>

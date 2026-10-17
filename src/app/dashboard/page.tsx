@@ -1,15 +1,17 @@
 'use client';
 import { EmptyCampaigns, EmptyClips } from '@/components/illustrations';
 
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Check } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile, type Profile } from '@/lib/supabase/hooks';
-import { useClipperOverview, useBrandOverview, topCpm, type ClipRow, type CampaignRow } from '@/lib/supabase/data';
+import { useClipperOverview, useBrandOverview, useClipDeltas, topCpm, type ClipRow, type CampaignRow } from '@/lib/supabase/data';
+import Performance from '@/components/dashboard/Performance';
+import ClipDetail from '@/components/dashboard/ClipDetail';
 import { NotchButton } from '@/components/pi';
 import {
-  PageHeader, StatStrip, Section, PlatformIcon, Chip, EmptyState, SkeletonRows, ErrorNote, Meter, usd, compact, CLIP_TONE, CAMPAIGN_TONE,
+  PageHeader, StatStrip, Section, PlatformIcon, Chip, EmptyState, SkeletonRows, ErrorNote, Meter, money, compact, CLIP_TONE, CAMPAIGN_TONE,
 } from '@/components/dashboard/ui';
 
 type T = (k: string) => string;
@@ -30,6 +32,9 @@ function ClipperOverview({ profile }: { profile: Profile }) {
   const { t } = useLanguage();
   const { data, loading, error, refresh } = useClipperOverview(profile.id);
   const { clips, accounts, campaigns, activeCount } = data;
+  const [open, setOpen] = useState<ClipRow | null>(null);
+  const recentIds = useMemo(() => clips.slice(0, 6).map((c) => c.id), [clips]);
+  const { data: deltas } = useClipDeltas(recentIds);
 
   const views = clips.reduce((a, c) => a + c.view_count, 0);
   const onHold = clips.filter((c) => c.status === 'tracking_hold').length;
@@ -61,8 +66,8 @@ function ClipperOverview({ profile }: { profile: Profile }) {
       <StatStrip
         loading={loading}
         items={[
-          { label: t('overview.c.available'), value: usd(profile.balance_earnings), hint: t('overview.c.availableHint') },
-          { label: t('overview.c.earned'), value: usd(profile.total_earnings), hint: t('overview.c.earnedHint') },
+          { label: t('overview.c.available'), value: money(profile.balance_earnings), hint: t('overview.c.availableHint') },
+          { label: t('overview.c.earned'), value: money(profile.total_earnings), hint: t('overview.c.earnedHint') },
           { label: t('overview.c.views'), value: compact(views), hint: t('overview.c.viewsHint').replace('{n}', String(clips.length)) },
           {
             label: t('overview.c.clips'),
@@ -73,6 +78,8 @@ function ClipperOverview({ profile }: { profile: Profile }) {
       />
 
       {!loading && steps.some((s) => !s.done) && <Checklist title={t('overview.startTitle')} steps={steps} t={t} />}
+
+      {clips.length > 0 && <Performance scope="me" moneyLabel={t('stats.earned')} clipsLabel={t('stats.submitted')} />}
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-12!">
         <Section
@@ -87,7 +94,7 @@ function ClipperOverview({ profile }: { profile: Profile }) {
           ) : (
             <ul className="divide-y divide-[var(--pi-line)]">
               {clips.slice(0, 6).map((c) => (
-                <ClipLine key={c.id} clip={c} t={t} />
+                <ClipLine key={c.id} clip={c} t={t} today={deltas[c.id]?.day || 0} onOpen={() => setOpen(c)} />
               ))}
             </ul>
           )}
@@ -111,20 +118,22 @@ function ClipperOverview({ profile }: { profile: Profile }) {
           )}
         </Section>
       </div>
+
+      <ClipDetail clip={open} onClose={() => setOpen(null)} />
     </div>
   );
 }
 
-function ClipLine({ clip, t }: { clip: ClipRow; t: T }) {
+function ClipLine({ clip, t, today, onOpen }: { clip: ClipRow; t: T; today: number; onOpen: () => void }) {
   return (
     <li className="flex items-center gap-4 py-3.5">
       <span className="pi-notch flex size-9 shrink-0 items-center justify-center bg-[var(--pi-line)] text-[var(--pi-ink-strong)]">
         <PlatformIcon platform={clip.platform} />
       </span>
       <div className="min-w-0 flex-1">
-        <a href={clip.video_url} target="_blank" rel="noreferrer" className="block truncate text-sm text-[var(--pi-ink-strong)] hover:underline">
+        <button type="button" onClick={onOpen} className="block max-w-full truncate text-left text-sm text-[var(--pi-ink-strong)] hover:underline cursor-pointer">
           {clip.campaign?.title || clip.video_url}
-        </a>
+        </button>
         <span className="block truncate text-xs text-[var(--pi-muted)]">
           {clip.status === 'tracking_hold'
             ? t('overview.holdLeft').replace('{h}', String(hoursLeft(clip.hold_until)))
@@ -133,9 +142,9 @@ function ClipLine({ clip, t }: { clip: ClipRow; t: T }) {
       </div>
       <div className="hidden text-right text-xs text-[var(--pi-muted)] tabular-nums sm:block!">
         <span className="block text-sm text-[var(--pi-ink-strong)]">{compact(clip.view_count)}</span>
-        {t('overview.viewsShort')}
+        {today > 0 ? <span className="text-emerald-600 dark:text-emerald-400!">+{compact(today)} {t('clips.today')}</span> : t('overview.viewsShort')}
       </div>
-      <div className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink-strong)]">{usd(clip.earnings)}</div>
+      <div className="w-20 text-right text-sm tabular-nums text-[var(--pi-ink-strong)]">{money(clip.earnings)}</div>
       <Chip tone={CLIP_TONE[clip.status]}>{t(`dash.clipStatus.${clip.status}`)}</Chip>
     </li>
   );
@@ -163,11 +172,11 @@ function CampaignCard({ c, t }: { c: CampaignRow; t: T }) {
         </div>
         <div className="text-right">
           <span className="block text-sm tabular-nums text-[var(--pi-ink-strong)]">
-            {usd(topCpm(c))}
+            {money(topCpm(c))}
             <span className="text-[var(--pi-muted)]"> / 1K</span>
           </span>
           <span className="block text-xs tabular-nums text-[var(--pi-muted)]">
-            {usd(c.remaining_budget, 0)} {t('overview.left')}
+            {money(c.remaining_budget, 0)} {t('overview.left')}
           </span>
         </div>
         <ArrowUpRight className="size-4 shrink-0 text-[var(--pi-muted)] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -213,14 +222,16 @@ function BrandOverview({ profile }: { profile: Profile }) {
       <StatStrip
         loading={loading}
         items={[
-          { label: t('shell.escrowBalance'), value: usd(profile.balance_escrow), hint: t('overview.b.escrowHint') },
+          { label: t('shell.escrowBalance'), value: money(profile.balance_escrow), hint: t('overview.b.escrowHint') },
           { label: t('overview.b.live'), value: String(live), hint: t('overview.b.liveHint').replace('{n}', String(campaigns.length)) },
           { label: t('overview.b.views'), value: compact(views), hint: t('overview.b.viewsHint') },
-          { label: t('overview.b.spent'), value: usd(spent), hint: t('overview.b.spentHint') },
+          { label: t('overview.b.spent'), value: money(spent), hint: t('overview.b.spentHint') },
         ]}
       />
 
       {!loading && steps.some((s) => !s.done) && <Checklist title={t('overview.startTitleBrand')} steps={steps} t={t} />}
+
+      {campaigns.some((c) => c.status !== 'pending_payment') && <Performance scope="brand" moneyLabel={t('stats.spent')} clipsLabel={t('stats.received')} />}
 
       <div className="grid grid-cols-1 gap-12 lg:grid-cols-12!">
         <Section
@@ -253,7 +264,7 @@ function BrandOverview({ profile }: { profile: Profile }) {
                     <div className="mt-3 flex items-center gap-4">
                       <Meter value={c.escrow_budget - c.remaining_budget} max={c.escrow_budget} />
                       <span className="shrink-0 text-xs tabular-nums text-[var(--pi-muted)]">
-                        {usd(c.escrow_budget - c.remaining_budget, 0)} / {usd(c.escrow_budget, 0)}
+                        {money(c.escrow_budget - c.remaining_budget, 0)} / {money(c.escrow_budget, 0)}
                       </span>
                     </div>
                   </Link>

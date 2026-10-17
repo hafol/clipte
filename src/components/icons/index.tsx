@@ -297,6 +297,18 @@ export const ExternalLink = make('ExternalLink', (
   </>
 ));
 
+export const Download = make('Download', (
+  <>
+    <D d="M4.5 14.5v2.4a2.6 2.6 0 0 0 2.6 2.6h9.8a2.6 2.6 0 0 0 2.6-2.6v-2.4" />
+    <G p="drop"><D d="M12 4.5v10M7.8 10.6 12 14.8l4.2-4.2" /></G>
+  </>
+));
+
+const BOOKMARK = 'M7.1 3.8h9.8a1.6 1.6 0 0 1 1.6 1.6v14.1a.6.6 0 0 1-.95.49L12 16.6l-5.55 3.39a.6.6 0 0 1-.95-.49V5.4a1.6 1.6 0 0 1 1.6-1.6Z';
+export const Bookmark = make('Bookmark', (
+  <G p="mark"><F d={BOOKMARK} /><D d={BOOKMARK} /></G>
+));
+
 export const Link2 = make('Link2', (
   <>
     <G p="half-a"><D d="M9.5 16.5h-2a4.5 4.5 0 0 1 0-9h2" /></G>
@@ -586,7 +598,7 @@ export const Crosshair = make('Crosshair', <G p="turn"><D d="M12 4v16M4 12h16" /
 export const ICONS = {
   LayoutGrid, Compass, Video, Wallet, Users, User, UserCheck, Target, PlusCircle, ShieldAlert, ShieldCheck, Sparkles, Bell,
   MessageSquare, PanelLeftClose, PanelLeft, LogOut, Settings, ArrowUpRight, ArrowRight, ArrowLeft, ArrowUp, ChevronDown,
-  ChevronLeft, ChevronRight, X, Plus, Minus, Check, CheckCheck, Search, Copy, ExternalLink, Link2, Trash2, Pause, Play,
+  ChevronLeft, ChevronRight, X, Plus, Minus, Check, CheckCheck, Search, Copy, ExternalLink, Download, Bookmark, Link2, Trash2, Pause, Play,
   Pencil, FolderOpen, ImagePlus, Star, RefreshCw, Headphones, AlertTriangle, Lock, BadgeCheck, CircleDollarSign, DollarSign,
   Flag, Megaphone, XCircle, Info, CheckCircle2, Eye, EyeOff, TrendingUp, Menu, Shield, Volume2, VolumeX, Zap, Flame,
   ClipMark, Scissors, Tag, Crosshair,

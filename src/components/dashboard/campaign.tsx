@@ -8,7 +8,8 @@ import { useLanguage } from '@/context/LanguageContext';
 import {
   type CampaignRow, type Platform, PLATFORM_NAME, rateFor, topCpm, createInvoice, checkInvoice, errText,
 } from '@/lib/supabase/data';
-import { PlatformIcon, Chip, Meter, usd, compact, CAMPAIGN_TONE } from './ui';
+import { PlatformIcon, Chip, Meter, money, usd, kzt, compact, CAMPAIGN_TONE } from './ui';
+import { moneyState } from '@/lib/money';
 import { Btn, Field, Notice, boxInputCls } from './forms';
 
 /** 16:9 cover; falls back to a typographic tile in the landing style. */
@@ -58,7 +59,7 @@ export function CampaignRowLine({ c, clips }: { c: CampaignRow; clips?: number }
             <span className="mt-1 flex items-center gap-2 text-xs text-[var(--pi-muted)]">
               <PlatformList platforms={c.platforms} className="size-3" />
               <span>·</span>
-              {usd(topCpm(c))} / 1K
+              {money(topCpm(c))} / 1K
             </span>
           </div>
           <Chip tone={CAMPAIGN_TONE[c.status]}>{t(`dash.campaignStatus.${c.status}`)}</Chip>
@@ -66,7 +67,7 @@ export function CampaignRowLine({ c, clips }: { c: CampaignRow; clips?: number }
         <div className="flex items-center gap-4">
           <Meter value={spent} max={c.escrow_budget} />
           <span className="shrink-0 text-xs tabular-nums text-[var(--pi-muted)]">
-            {usd(spent, 0)} / {usd(c.escrow_budget, 0)}
+            {money(spent, 0)} / {money(c.escrow_budget, 0)}
           </span>
         </div>
         <div className="flex gap-5 text-xs tabular-nums text-[var(--pi-muted)]">
@@ -108,15 +109,15 @@ export function RateTable({ c }: { c: CampaignRow }) {
             </div>
             <div className="cr-card flex flex-1 flex-col gap-3 rounded-b-2xl bg-[var(--pi-surface)] px-4 pb-4 pt-3">
               <p className="text-[1.75rem] font-light leading-none tracking-[-0.04em] tabular-nums text-[var(--pi-ink-strong)]">
-                {usd(r.cpm)}
+                {money(r.cpm)}
                 <span className="ml-1 text-xs tracking-normal text-[var(--pi-muted)]">/ 1K {t('common.views')}</span>
               </p>
               <div className="flex flex-wrap gap-1.5">
                 <span className="cr-chip flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold tabular-nums text-[var(--pi-ink-strong)]">
-                  <span className="font-normal text-[var(--pi-muted)]">{t('camp.minPayout')}</span> {r.minPayout ? usd(r.minPayout) : '—'}
+                  <span className="font-normal text-[var(--pi-muted)]">{t('camp.minPayout')}</span> {r.minPayout ? money(r.minPayout) : '—'}
                 </span>
                 <span className="cr-chip flex h-7 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold tabular-nums text-[var(--pi-ink-strong)]">
-                  <span className="font-normal text-[var(--pi-muted)]">{t('camp.maxPerClip')}</span> {r.maxCap ? usd(r.maxCap, 0) : t('camp.noCap')}
+                  <span className="font-normal text-[var(--pi-muted)]">{t('camp.maxPerClip')}</span> {r.maxCap ? money(r.maxCap, 0) : t('camp.noCap')}
                 </span>
               </div>
             </div>
@@ -229,6 +230,7 @@ export function FundPanel({
           />
         </div>
       </Field>
+      {valid && moneyState().rate && <p className="-mt-3 text-xs tabular-nums text-[var(--pi-muted)]">≈ {kzt(value)} · {t('fund.inUsd')}</p>}
       <Notice>{t('fund.note')}</Notice>
       {error && <Notice tone="red">{error}</Notice>}
       <Btn onClick={start} disabled={!valid} loading={busy} size="lg" className="w-full">

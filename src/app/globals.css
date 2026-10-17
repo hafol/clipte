@@ -1044,6 +1044,11 @@ html:has(body .pi.min-h-screen) body::-webkit-scrollbar {
 :is(.ci[data-ci-play], .ci[data-ci-on]) [data-p="go-u"] { animation: ci-go-u .7s var(--ci-out) both; }
 :is(.ci[data-ci-play], .ci[data-ci-on]) [data-p="go-d"] { animation: ci-go-d .7s var(--ci-out) both; }
 @keyframes ci-shoot { 0% { transform: none; } 38% { transform: translate(7px, -7px); opacity: 0; } 39% { transform: translate(-7px, 7px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+/* download: arrow drops into the tray; bookmark: dips and springs back */
+:is(.ci[data-ci-play], .ci[data-ci-on]) [data-p="drop"] { animation: ci-drop .7s var(--ci-out) both; }
+@keyframes ci-drop { 0% { transform: none; } 40% { transform: translateY(6px); opacity: 0; } 41% { transform: translateY(-7px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+:is(.ci[data-ci-play], .ci[data-ci-on]) [data-p="mark"] { transform-origin: 50% 0; animation: ci-mark .8s var(--ci-spring) both; }
+@keyframes ci-mark { 0% { transform: none; } 35% { transform: scaleY(1.14); } 65% { transform: scaleY(.94); } 100% { transform: none; } }
 @keyframes ci-go-r { 0% { transform: none; } 38% { transform: translateX(9px); opacity: 0; } 39% { transform: translateX(-9px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes ci-go-l { 0% { transform: none; } 38% { transform: translateX(-9px); opacity: 0; } 39% { transform: translateX(9px); opacity: 0; } 100% { transform: none; opacity: 1; } }
 @keyframes ci-go-u { 0% { transform: none; } 38% { transform: translateY(-9px); opacity: 0; } 39% { transform: translateY(9px); opacity: 0; } 100% { transform: none; opacity: 1; } }
@@ -1421,3 +1426,28 @@ html:has(body .pi.min-h-screen) body::-webkit-scrollbar {
 @media (prefers-reduced-motion: reduce) {
   .msg-backdrop, .msg-panel, .msg-thread .msg-in, .msg-fab, .msg-typing i { animation: none !important; }
 }
+
+/* ==========================================================================
+   Charts (src/components/dashboard/charts.tsx)
+   ========================================================================== */
+@keyframes ch-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes ch-fade { from { opacity: 0; } }
+@keyframes ch-grow { from { transform: scaleY(0); } }
+@keyframes ch-grow-x { from { transform: scaleX(0); } }
+.ch-draw { stroke-dasharray: 1; stroke-dashoffset: 0; animation: ch-draw 1.1s var(--pi-ease, ease) both; }
+.ch-fade { animation: ch-fade .9s ease .25s both; }
+.ch-grow { transform-box: fill-box; transform-origin: bottom; animation: ch-grow .6s var(--pi-ease, ease) both; }
+.ch-grow-x { transform-origin: left; animation: ch-grow-x .8s var(--pi-ease, ease) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ch-draw, .ch-fade, .ch-grow, .ch-grow-x { animation: none !important; }
+}
+
+/* Discover: bookmark pop */
+@keyframes cr-save-pop { 0% { transform: scale(1); } 35% { transform: scale(1.22); } 70% { transform: scale(.92); } 100% { transform: scale(1); } }
+.cr-save-pop { animation: cr-save-pop .45s cubic-bezier(.34, 1.56, .64, 1); }
+@media (prefers-reduced-motion: reduce) { .cr-save-pop { animation: none; } }
+
+/* Submit dialog: preview card slides in */
+@keyframes cr-preview-in { from { opacity: 0; transform: translateY(6px); } }
+.cr-preview { animation: cr-preview-in .35s cubic-bezier(.22, 1, .36, 1); }
+@media (prefers-reduced-motion: reduce) { .cr-preview { animation: none; } }
