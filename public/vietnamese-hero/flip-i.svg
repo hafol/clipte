@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" width="600" height="600">
+  <rect width="600" height="600" fill="#F5F0E8"/>
+  <!-- Decorative Background Circles in Swiss Style -->
+  <circle cx="300" cy="300" r="180" fill="#E8E0D2" />
+  <circle cx="300" cy="300" r="120" fill="#D3380D" />
+  <!-- Center Icon / Lightning -->
+  <path d="M320 120 L220 310 L290 310 L260 480 L380 280 L310 280 Z" fill="#F5F0E8" stroke="#151515" stroke-width="12" stroke-linejoin="round"/>
+</svg>

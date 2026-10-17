@@ -1,0 +1,35 @@
+# dependencies & build output
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# secrets — set these in Vercel → Settings → Environment Variables instead
+.env
+.env.*
+!.env.example
+
+# local tooling
+.vercel/
+.agents/
+*.log
+.DS_Store
+Thumbs.db
+
+# design reference material saved from other sites (not part of the app)
+*.mhtml
+scratch/
+Pensatori Irrazionali inspire.html
+Pensatori Irrazionali inspire_files/
+primesec_*
+vietnamese_*
+whop_*
+analyze_*.js
+check_hero_files.js
+download_*.js
+extract_*.js
+find_*.js
+inspect_*.js
+make_letter_svgs.js
+parse_sections.js
