@@ -187,8 +187,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-or-publishable-key
 2. До деплоя: Админ → вкладка «Трекинг» → «Запустить сейчас».
 3. После деплоя на Vercel:
    - задайте в Vercel → Settings → Environment Variables те же ключи, что в `.env.local` (включая `CRON_SECRET`);
-   - откройте `supabase/cron/schedule_tracking.sql` и замените `YOUR-SITE` и `YOUR-CRON-SECRET`;
-   - выполните файл в SQL Editor. Supabase будет вызывать `/api/tracking/run` каждые 3 часа (pg_cron + pg_net, секрет хранится в Vault).
+   - скопируйте `supabase/cron/schedule_tracking.sql` в SQL Editor и **только там** замените `YOUR-SITE` и `YOUR-CRON-SECRET` в шаге 1 (секрет не сохраняйте в файл — он на GitHub);
+   - выполните. Supabase будет вызывать `/api/tracking/run` каждый час (pg_cron + pg_net, значения хранятся в Vault), а ночью чистить старые логи. Скрипт можно запускать повторно, например чтобы исправить опечатку.
    - `vercel.json` дополнительно вызывает трекинг раз в день: бесплатный план Vercel чаще не позволяет.
 4. Источники просмотров:
    - **YouTube:** публичная страница, с `YOUTUBE_API_KEY` — официальный API.

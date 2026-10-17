@@ -3,7 +3,7 @@ import { runTracking } from '@/lib/tracking/run';
 import { handleRouteError, jsonError } from '@/lib/api';
 
 // Scheduled tracking pass. Called with  Authorization: Bearer <CRON_SECRET>  by:
-//   - Supabase pg_cron every 3 hours (supabase/cron/schedule_tracking.sql)
+//   - Supabase pg_cron every hour (supabase/cron/schedule_tracking.sql)
 //   - Vercel Cron once a day as a backup (vercel.json; Vercel sends the header itself)
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
