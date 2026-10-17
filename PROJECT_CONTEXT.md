@@ -196,6 +196,20 @@ src/
 
 ## История изменений (Changelog)
 
+### [2026-10-18] — Деплой на Vercel
+- **Репозиторий:** приватный GitHub `hafol/clipte`, ветка `main`; каждый push в `main` = Production-деплой.
+- **Сайт:** https://clipte.vercel.app. `/api/health/supabase` → healthy; `/api/tracking/run` и `/api/tracking/run-now` без авторизации → 401.
+- **`.gitignore` добавлен.** Он исключает `.env*`, `node_modules`, `.next` и референсы с других сайтов (`*.mhtml`, `whop_*`, `primesec_*`, `vietnamese_*`, Pensatori, `scratch/`, скрипты анализа).
+- **Перед коммитом:** скан на ключи; в `SUPABASE_SETUP_GUIDE.md` старые URL и anon key заменены плейсхолдерами; `npm run build` проходит.
+- **Supabase Auth → URL Configuration:**
+  - Site URL = `https://clipte.vercel.app`;
+  - Redirect URLs = `https://clipte.vercel.app/**` и `http://localhost:3000/**`.
+  - Без этого вход после логина уводил на localhost: Supabase откатывается на Site URL, если адреса нет в списке.
+- **Переменные Vercel:**
+  - `NEXT_PUBLIC_*` — тип Config (они публичные по замыслу);
+  - остальные — Secret;
+  - `NEXT_PUBLIC_APP_URL` должен быть `https://clipte.vercel.app`, после изменения нужен Redeploy.
+
 ### [2026-10-18] — Автоматический подсчёт просмотров
 - **Расписание:**
   - Supabase pg_cron + pg_net каждые 3 часа (`supabase/cron/schedule_tracking.sql`, URL и `CRON_SECRET` в Vault);
