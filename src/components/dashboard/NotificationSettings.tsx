@@ -8,15 +8,7 @@ import {
 } from '@/lib/supabase/data';
 import { Btn, Notice } from '@/components/dashboard/forms';
 import { Label } from '@/components/dashboard/ui';
-
-function TelegramGlyph({ className = '' }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden>
-      <circle cx="12" cy="12" r="12" fill="#2AABEE" />
-      <path d="M5.4 11.8 16.9 7.4c.53-.19 1 .13.83.94l-1.96 9.2c-.15.66-.54.82-1.09.51l-3-2.21-1.45 1.4c-.16.16-.3.3-.6.3l.21-3.06 5.56-5.02c.24-.21-.05-.33-.38-.12l-6.87 4.33-2.96-.93c-.64-.2-.66-.64.14-.95Z" fill="#fff" />
-    </svg>
-  );
-}
+import { TelegramButton, TelegramFeed, TelegramLogo } from '@/components/dashboard/TelegramArt';
 
 /** Settings → Notifications: Telegram delivery + category alerts. */
 export default function NotificationSettings({ userId, toast }: { userId: string; toast: (msg: string, tone?: 'green' | 'red') => void }) {
@@ -83,7 +75,7 @@ export default function NotificationSettings({ userId, toast }: { userId: string
     <div className="space-y-8">
       <section className="pi-notch pi-edge overflow-hidden bg-[var(--pi-surface)]">
         <div className="flex flex-col gap-5 p-6 sm:flex-row! sm:items-center! md:p-8!">
-          <TelegramGlyph className="size-12 shrink-0" />
+          <TelegramLogo className="size-12 shrink-0" />
           <div className="min-w-0 flex-1">
             <h3 className="text-lg font-light tracking-[-0.02em] text-[var(--pi-ink-strong)]">{t('ns.tgTitle')}</h3>
             <p className="mt-1 text-sm font-light text-[var(--pi-ink)]">{t('ns.tgDesc')}</p>
@@ -107,9 +99,9 @@ export default function NotificationSettings({ userId, toast }: { userId: string
               </div>
             </div>
           ) : (
-            <Btn onClick={connect} loading={busy || waiting} className="bg-[#2AABEE]! text-white!">
+            <TelegramButton onClick={connect} busy={busy} waiting={waiting}>
               {waiting ? t('ns.waiting') : t('ns.connect')}
-            </Btn>
+            </TelegramButton>
           )}
         </div>
         {waiting && !link && (
@@ -122,14 +114,9 @@ export default function NotificationSettings({ userId, toast }: { userId: string
             <Notice tone="amber">{t('ns.notReady')}</Notice>
           </div>
         )}
-        <ul className="grid gap-x-6 gap-y-2 border-t border-[var(--pi-line)] px-6 py-5 text-[13px] text-[var(--pi-ink)] sm:grid-cols-2! md:px-8!">
-          {['ex1', 'ex2', 'ex3', 'ex4'].map((k) => (
-            <li key={k} className="flex items-start gap-2">
-              <span aria-hidden>{t(`ns.${k}i`)}</span>
-              <span className="font-light">{t(`ns.${k}`)}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="border-t border-[var(--pi-line)] px-4 py-4 md:px-6!">
+          <TelegramFeed t={t} />
+        </div>
       </section>
 
       <section className="space-y-4">
