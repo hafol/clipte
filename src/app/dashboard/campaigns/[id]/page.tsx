@@ -11,7 +11,7 @@ import { useMessenger } from '@/lib/supabase/messenger';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile } from '@/lib/supabase/hooks';
 import {
-  useCampaignDetail, submitClip, previewClip, updateCampaign, approveCampaign, errText, PLATFORM_NAME, topCpm, rateFor,
+  useCampaignDetail, useMyLevel, levelRank, categoryLabel, LEVEL_AT, submitClip, previewClip, updateCampaign, approveCampaign, errText, PLATFORM_NAME, topCpm, rateFor,
   type CampaignRow, type ClipRow, type ClipPreview, type Platform, type SocialAccountRow,
 } from '@/lib/supabase/data';
 import {
@@ -20,6 +20,7 @@ import {
 import { Btn, CopyButton, Field, Modal, Notice, Tabs, boxInputCls, inputCls, timeAgo, useToast } from '@/components/dashboard/forms';
 import { CampaignCover, FundPanel, PlatformList, RateTable } from '@/components/dashboard/campaign';
 import CampaignStats from '@/components/dashboard/CampaignStats';
+import { LevelMedal } from '@/components/dashboard/levels';
 
 type T = (k: string) => string;
 type Tab = 'stats' | 'brief' | 'leaders' | 'mine' | 'subs' | 'deposits';
@@ -39,6 +40,7 @@ export default function CampaignDetailPage() {
   const { t, lang } = useLanguage();
   const { profile } = useUserProfile();
   const { data, loading, error, refresh } = useCampaignDetail(id, profile?.id);
+  const { data: myLevel } = useMyLevel(!!profile);
   const { toast, toastNode } = useToast();
 
   const [tab, setTab] = useState<Tab>('brief');
@@ -88,7 +90,9 @@ export default function CampaignDetailPage() {
   }
 
   const spent = Math.max(0, c.escrow_budget - c.remaining_budget);
-  const canSubmit = c.status === 'active' && c.remaining_budget > 0 && !isOwner;
+  // premium campaigns: clippers below the minimum level can't join yet
+  const locked = !!c.min_level && !!myLevel && levelRank(myLevel.level) < levelRank(c.min_level);
+  const canSubmit = c.status === 'active' && c.remaining_budget > 0 && !isOwner && !locked;
   const canFund = isOwner && ['pending_payment', 'pending_review', 'active', 'paused'].includes(c.status);
   const canReview = isStaff && !isOwner && c.status === 'pending_review';
 
@@ -168,7 +172,7 @@ export default function CampaignDetailPage() {
                 </span>
                 <span className="truncate">{c.brand_name}</span>
                 {c.status === 'active' && <ReviewedMark />}
-                {c.category && <span className="text-white/55">· {c.category}</span>}
+                {c.category && <span className="text-white/55">· {categoryLabel(c.category, t)}</span>}
               </div>
               <h1 className="line-clamp-3 text-[clamp(2rem,4.6vw,4rem)] font-light leading-[0.95] tracking-[-0.05em]">{c.title}</h1>
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -177,6 +181,11 @@ export default function CampaignDetailPage() {
                     <PlatformIcon platform={p} className="size-3.5" /> {PLATFORM_NAME[p]}
                   </span>
                 ))}
+                {c.min_level && (
+                  <span className="flex h-7 items-center gap-1 rounded-full bg-white/15 pl-1 pr-2.5 text-[12px] backdrop-blur-md" title={t('lvl.premiumTip')}>
+                    <LevelMedal level={c.min_level} className="size-5" /> {t(`lvl.${c.min_level}`)}+
+                  </span>
+                )}
               </div>
             </div>
 
@@ -233,6 +242,14 @@ export default function CampaignDetailPage() {
         </Notice>
       )}
       {canReview && <Notice tone="blue">{t('camp.staffReview').replace('{n}', money(c.escrow_budget))}</Notice>}
+      {locked && myLevel && (
+        <Notice tone="amber">
+          {t('lvl.locked')
+            .replace('{level}', t(`lvl.${c.min_level}`))
+            .replace('{mine}', t(`lvl.${myLevel.level}`))
+            .replace('{n}', compact(Math.max(0, LEVEL_AT[c.min_level!] - myLevel.views)))}
+        </Notice>
+      )}
       {!isOwner && !canReview && c.status !== 'active' && <Notice>{c.status === 'pending_review' ? t('camp.notYetLive') : t('camp.notOpen')}</Notice>}
 
       {/* ---------- budget band (card language from Discover) ---------- */}

@@ -1,14 +1,15 @@
 'use client';
 import { NotFound } from '@/components/illustrations';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, MessageSquare, Pencil } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile } from '@/lib/supabase/hooks';
 import { useMessenger } from '@/lib/supabase/messenger';
-import { usePublicCreator, setFollow, errText } from '@/lib/supabase/data';
+import { usePublicCreator, setFollow, errText, creatorLevel, type Level } from '@/lib/supabase/data';
+import { LevelBadge } from '@/components/dashboard/levels';
 import { StatStrip, EmptyState, ErrorNote, SkeletonRows, Label, compact } from '@/components/dashboard/ui';
 import { Btn, CopyButton, useToast } from '@/components/dashboard/forms';
 
@@ -17,6 +18,10 @@ export default function CreatorProfilePage() {
   const { t } = useLanguage();
   const { profile: me } = useUserProfile();
   const { data, setData, loading, error, refresh } = usePublicCreator(id, me?.id);
+  const [level, setLevel] = useState<Level | null>(null);
+  useEffect(() => {
+    if (id) creatorLevel(id).then(setLevel);
+  }, [id]);
   const messenger = useMessenger();
   const { toast, toastNode } = useToast();
   const [busy, setBusy] = useState(false);
@@ -62,6 +67,7 @@ export default function CreatorProfilePage() {
           <div className="min-w-0 pb-1">
             <Label>{p.role === 'admin' || p.role === 'moderator' ? t('creator.team') : p.has_brand_profile ? t('creator.brandAndClipper') : t('creator.clipper')}</Label>
             <h1 className="mt-2 truncate text-[clamp(2rem,4.4vw,3.5rem)] font-light leading-[0.95] tracking-[-0.05em] text-[var(--pi-ink-strong)]">{name}</h1>
+            {level && <LevelBadge level={level} className="mt-3" />}
             {p.brand_name && <p className="mt-2 text-sm text-[var(--pi-muted)]">{p.brand_name}</p>}
           </div>
         </div>

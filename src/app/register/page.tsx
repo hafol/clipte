@@ -41,6 +41,10 @@ export default function AuthSplitPage() {
     if (r) {
       setRef(r);
       setMode('signup');
+      // Google sign-up can't carry the code through OAuth — the dashboard claims it after login
+      try {
+        localStorage.setItem('clipte_ref', r);
+      } catch {}
     }
   }, [t]);
 

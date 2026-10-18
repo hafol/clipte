@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Check, ExternalLink, AlertTriangle } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
-import { useClipReadings, type ClipRow } from '@/lib/supabase/data';
-import { Modal, timeAgo } from '@/components/dashboard/forms';
+import { useClipReadings, useMyAppeals, appealClip, errText, type ClipRow } from '@/lib/supabase/data';
+import { Btn, Modal, Notice, boxInputCls, timeAgo } from '@/components/dashboard/forms';
 import { Chip, PlatformIcon, money, moneyAlt, compact, CLIP_TONE } from '@/components/dashboard/ui';
 import { AreaChart, useNow, type Point } from '@/components/dashboard/charts';
 
@@ -134,6 +134,8 @@ export default function ClipDetail({ clip, onClose, onWithdraw }: { clip: ClipRo
           ))}
         </ol>
 
+        {problem && <AppealBox clip={clip} />}
+
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--pi-line)] pt-4">
           <Link href={`/dashboard/campaigns/${clip.campaign_id}`} className="text-[13px] text-[var(--pi-ink)] hover:text-[var(--pi-ink-strong)] hover:underline">
             {t('cd.openCampaign')}
@@ -146,5 +148,96 @@ export default function ClipDetail({ clip, onClose, onWithdraw }: { clip: ClipRo
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Contest a rejected / flagged clip: one open appeal at a time, two in total. */
+function AppealBox({ clip }: { clip: ClipRow }) {
+  const { t, lang } = useLanguage();
+  const { data: byClip, loading, refresh } = useMyAppeals(clip.user_id);
+  const appeals = byClip[clip.id] || [];
+  const last = appeals[0];
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [proof, setProof] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (loading && !appeals.length) return <div className="h-16 animate-pulse rounded-lg bg-[var(--pi-line)]/60" />;
+
+  const send = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await appealClip(clip.id, message.trim(), proof.trim() || null);
+      setOpen(false);
+      setMessage('');
+      setProof('');
+      refresh();
+    } catch (e) {
+      setError(errText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const canAppeal = !last || (last.status === 'declined' && appeals.length < 2);
+  const proofOk = !proof.trim() || /^https?:\/\//i.test(proof.trim());
+
+  return (
+    <div className="cr-preview space-y-3 rounded-xl bg-[var(--pi-bg)] p-4">
+      {last?.status === 'open' && (
+        <>
+          <p className="text-sm text-[var(--pi-ink-strong)]">{t('ap.sent').replace('{t}', timeAgo(last.created_at, lang))}</p>
+          <p className="text-[13px] font-light text-[var(--pi-ink)]">“{last.message}”</p>
+          <p className="text-xs text-[var(--pi-muted)]">{t('ap.sentHint')}</p>
+        </>
+      )}
+      {last?.status === 'declined' && (
+        <Notice tone="red">
+          {t('ap.declined')}
+          {last.reply ? `: ${last.reply}` : ''}
+        </Notice>
+      )}
+      {last?.status === 'accepted' && <Notice tone="green">{t('ap.accepted')}</Notice>}
+
+      {canAppeal && !open && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[13px] font-light text-[var(--pi-ink)]">{last ? t('ap.again') : t('ap.prompt')}</p>
+          <Btn size="sm" variant="outline" onClick={() => setOpen(true)}>
+            {t('ap.cta')}
+          </Btn>
+        </div>
+      )}
+      {!canAppeal && last?.status === 'declined' && <p className="text-xs text-[var(--pi-muted)]">{t('ap.limit')}</p>}
+
+      {open && (
+        <div className="space-y-3">
+          <textarea
+            autoFocus
+            value={message}
+            onChange={(e) => setMessage(e.target.value.slice(0, 1000))}
+            rows={4}
+            placeholder={t('ap.messagePh')}
+            className={`${boxInputCls} min-h-[96px] resize-y py-2.5`}
+          />
+          <div className="flex justify-between text-[11px] text-[var(--pi-muted)]">
+            <span>{t('ap.messageHint')}</span>
+            <span className="tabular-nums">{message.trim().length}/1000</span>
+          </div>
+          <input value={proof} onChange={(e) => setProof(e.target.value)} placeholder={t('ap.proofPh')} className={boxInputCls} inputMode="url" />
+          {!proofOk && <p className="text-xs text-rose-600">{t('ap.proofBad')}</p>}
+          {error && <Notice tone="red">{error}</Notice>}
+          <div className="flex justify-end gap-2">
+            <Btn size="sm" variant="ghost" onClick={() => setOpen(false)}>
+              {t('common.cancel')}
+            </Btn>
+            <Btn size="sm" onClick={send} loading={busy} disabled={message.trim().length < 10 || !proofOk}>
+              {t('ap.send')}
+            </Btn>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

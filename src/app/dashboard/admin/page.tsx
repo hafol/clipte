@@ -255,6 +255,8 @@ function TrackingPanel({ t, lang, toast }: { t: T; lang: string; toast: (msg: st
         </Btn>
       </div>
 
+      <TelegramBotCard t={t} toast={toast} />
+
       <Section title={t('trk.sources')}>
         <ul className="divide-y divide-[var(--pi-line)]">
           {source(true, t('trk.srcPublic'), '')}
@@ -289,5 +291,57 @@ function TrackingPanel({ t, lang, toast }: { t: T; lang: string; toast: (msg: st
         )}
       </Section>
     </div>
+  );
+}
+
+/** Telegram bot status + one-click connect (webhook, commands, token in the database). */
+function TelegramBotCard({ t, toast }: { t: T; toast: (msg: string, tone?: 'green' | 'red') => void }) {
+  const [state, setState] = useState<{ token: boolean; bot?: string | null; connected?: boolean; webhook?: string | null; expected?: string; lastError?: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () =>
+    fetch('/api/telegram/setup')
+      .then((r) => r.json())
+      .then((j) => setState(j.ok ? j : { token: false }))
+      .catch(() => setState({ token: false }));
+  React.useEffect(() => {
+    load();
+  }, []);
+
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const r = await fetch('/api/telegram/setup', { method: 'POST' });
+      const j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || 'failed');
+      toast(t('tgb.done').replace('{bot}', j.bot ? `@${j.bot}` : ''));
+      load();
+    } catch (e) {
+      toast(errText(e), 'red');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Section title={t('tgb.title')}>
+      {!state ? (
+        <SkeletonRows rows={1} />
+      ) : !state.token ? (
+        <Notice tone="amber">{t('tgb.noToken')}</Notice>
+      ) : (
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="min-w-0 flex-1 text-sm">
+            <span className="block text-[var(--pi-ink-strong)]">{state.bot ? `@${state.bot}` : '—'}</span>
+            <span className={`block text-xs ${state.connected ? 'text-emerald-600 dark:text-emerald-400!' : 'text-amber-600 dark:text-amber-400!'}`}>
+              {state.connected ? t('tgb.connected') : t('tgb.notConnected')}
+            </span>
+            {state.lastError && <span className="block text-xs text-rose-600">{state.lastError}</span>}
+          </div>
+          <Btn variant={state.connected ? 'outline' : 'solid'} onClick={connect} loading={busy}>
+            {state.connected ? t('tgb.reconnect') : t('tgb.connect')}
+          </Btn>
+        </div>
+      )}
+    </Section>
   );
 }

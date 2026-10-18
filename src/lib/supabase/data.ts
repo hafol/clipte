@@ -20,6 +20,7 @@ export interface CampaignRow {
   title: string;
   brand_name: string;
   category: string | null;
+  min_level?: 'silver' | 'gold' | 'platinum' | null;
   drive_url: string;
   icon_url: string | null;
   cover_url: string | null;
@@ -163,7 +164,7 @@ export const rateFor = (c: CampaignRow, p: Platform): Required<Pick<PlatformRate
 export const topCpm = (c: CampaignRow) => Math.max(c.cpm_rate, ...c.platforms.map((p) => rateFor(c, p).cpm));
 
 export const CAMPAIGN_COLS =
-  'id, brand_id, title, brand_name, category, drive_url, icon_url, cover_url, hashtags, guidelines, description, dos, donts, brand_handle, platforms, platform_rates, cpm_rate, max_payout_per_clip, escrow_budget, remaining_budget, views_delivered, status, rejection_reason, created_at';
+  'id, brand_id, title, brand_name, category, drive_url, icon_url, cover_url, hashtags, guidelines, description, dos, donts, brand_handle, platforms, platform_rates, cpm_rate, max_payout_per_clip, min_level, escrow_budget, remaining_budget, views_delivered, status, rejection_reason, created_at';
 const CLIP_COLS =
   'id, user_id, campaign_id, platform, video_url, view_count, paid_views, earnings, status, status_reason, hold_until, last_checked_at, created_at, campaign:campaigns(title, brand_name)';
 
@@ -390,6 +391,7 @@ export type CampaignDraft = {
   platform_rates: Partial<Record<Platform, PlatformRate>>;
   cpm_rate: number;
   max_payout_per_clip: number | null;
+  min_level?: 'silver' | 'gold' | 'platinum' | null; // premium campaigns (v2.9)
 };
 
 /** Brief text kept in `guidelines` too, for older readers. */
@@ -842,6 +844,168 @@ export async function previewClip(url: string, campaignId: string, signal?: Abor
   });
   return res.json().catch(() => ({ ok: false }));
 }
+
+/* ============================== Levels ============================== */
+
+export type Level = 'bronze' | 'silver' | 'gold' | 'platinum';
+export const LEVELS: Level[] = ['bronze', 'silver', 'gold', 'platinum'];
+export const LEVEL_AT: Record<Level, number> = { bronze: 0, silver: 100_000, gold: 1_000_000, platinum: 10_000_000 };
+export const LEVEL_HOLD: Record<Level, number> = { bronze: 48, silver: 36, gold: 24, platinum: 12 };
+export const levelRank = (l: Level | null | undefined) => (l ? LEVELS.indexOf(l) : 0);
+export interface MyLevel { level: Level; views: number; next: Level | null; next_at: number | null; hold_hours: number }
+
+export function useMyLevel(enabled: boolean) {
+  return useLoad<MyLevel | null>(
+    async () => {
+      const l = await softRpc<any>('my_level', {}, null);
+      return l ? { ...l, views: num(l.views), next_at: l.next_at == null ? null : num(l.next_at), hold_hours: num(l.hold_hours) } : null;
+    },
+    enabled ? 'mylevel' : null,
+    null
+  );
+}
+
+export const creatorLevel = (id: string) => softRpc<Level | null>('creator_level', { p_user: id }, null);
+
+/* ============================== Referrals ============================== */
+
+export interface Referral { id: string; name: string | null; avatar: string | null; joined_at: string; progress: number; reward: number }
+
+export function useMyReferrals(enabled: boolean) {
+  return useLoad<Referral[]>(
+    async () => (await softRpc<any[]>('my_referrals', {}, [])).map((r) => ({ ...r, progress: num(r.progress), reward: num(r.reward) })),
+    enabled ? 'referrals' : null,
+    []
+  );
+}
+
+/** Claim an invite code after a Google sign-up (no-op if already referred or the account isn't new). */
+export const claimReferral = (code: string) => softRpc<boolean>('claim_referral', { p_code: code }, false);
+
+/* ============================== Appeals ============================== */
+
+export interface Appeal {
+  id: number;
+  clip_id: string;
+  user_id: string;
+  message: string;
+  proof_url: string | null;
+  status: 'open' | 'accepted' | 'declined';
+  reply: string | null;
+  created_at: string;
+  decided_at: string | null;
+}
+
+/** My appeals, keyed by clip (latest first). */
+export function useMyAppeals(userId?: string) {
+  const supabase = getSupabaseBrowserClient();
+  return useLoad<Record<string, Appeal[]>>(
+    async () => {
+      const { data, error } = await supabase.from('clip_appeals').select('*').eq('user_id', userId!).order('created_at', { ascending: false });
+      if (error) return {}; // v2.9 not run yet
+      const out: Record<string, Appeal[]> = {};
+      for (const a of data || []) (out[a.clip_id] ||= []).push(a as Appeal);
+      return out;
+    },
+    userId ? `appeals:${userId}` : null,
+    {}
+  );
+}
+
+export interface StaffAppeal extends Appeal {
+  clip: { id: string; platform: Platform; video_url: string; status: ClipStatus; status_reason: string | null; view_count: number; campaign: { title: string } | null; account: { handle: string } | null } | null;
+  author: { full_name: string | null; avatar_url: string | null } | null;
+}
+
+export function useStaffAppeals(enabled: boolean) {
+  const supabase = getSupabaseBrowserClient();
+  return useLoad<StaffAppeal[]>(
+    async () => {
+      const { data, error } = await supabase
+        .from('clip_appeals')
+        .select('*, clip:clips(id, platform, video_url, status, status_reason, view_count, campaign:campaigns(title), account:social_accounts(handle))')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) return [];
+      const ids = [...new Set((data || []).map((a: any) => a.user_id))];
+      const people = ids.length ? await softRpc<any[]>('list_public_profiles', {}, []) : [];
+      const byId = Object.fromEntries(people.map((p: any) => [p.id, p]));
+      return (data || []).map((a: any) => ({
+        ...a,
+        clip: a.clip ? { ...one(a.clip), view_count: num(one(a.clip)?.view_count), campaign: one(one(a.clip)?.campaign), account: one(one(a.clip)?.account) } : null,
+        author: byId[a.user_id] ? { full_name: byId[a.user_id].full_name, avatar_url: byId[a.user_id].avatar_url } : null,
+      }));
+    },
+    enabled ? 'staff-appeals' : null,
+    []
+  );
+}
+
+export const appealClip = (clipId: string, message: string, proofUrl: string | null) =>
+  rpc('appeal_clip', { p_clip_id: clipId, p_message: message, p_proof_url: proofUrl });
+export const decideAppeal = (id: number, accept: boolean, reply: string) => rpc('decide_appeal', { p_appeal_id: id, p_accept: accept, p_reply: reply });
+
+/* ============================== Category alerts ============================== */
+
+export const CATEGORY_KEYS = ['podcasts', 'streaming', 'gaming', 'music', 'sports', 'tech', 'finance', 'lifestyle', 'education', 'other'] as const;
+export type CategoryKey = (typeof CATEGORY_KEYS)[number];
+const isCategoryKey = (c: string): c is CategoryKey => (CATEGORY_KEYS as readonly string[]).includes(c);
+
+/** Campaign categories are stored as keys since v2.9; older free-text values are shown as they are. */
+export const categoryLabel = (c: string | null | undefined, t: (k: string) => string) => (!c ? '' : isCategoryKey(c) ? t(`create.cat.${c}`) : c);
+
+export function useCategoryFollows(userId?: string) {
+  const supabase = getSupabaseBrowserClient();
+  const load = useLoad<CategoryKey[]>(
+    async () => {
+      const { data, error } = await supabase.from('category_follows').select('category');
+      if (error) return [];
+      return (data || []).map((r: any) => r.category);
+    },
+    userId ? `follows:${userId}` : null,
+    []
+  );
+  const toggle = async (c: CategoryKey) => {
+    const before = load.data;
+    const on = before.includes(c);
+    load.setData(on ? before.filter((x) => x !== c) : [...before, c]);
+    const { error } = on
+      ? await supabase.from('category_follows').delete().eq('category', c)
+      : await supabase.from('category_follows').insert({ user_id: userId, category: c });
+    if (error) {
+      load.setData(before);
+      throw error;
+    }
+    return !on;
+  };
+  return { follows: load.data, toggle, loading: load.loading };
+}
+
+/* ============================== Telegram ============================== */
+
+export interface TelegramLink { chat_id: number | null; username: string | null; enabled: boolean; linked_at: string | null }
+
+export function useTelegramLink(userId?: string) {
+  const supabase = getSupabaseBrowserClient();
+  return useLoad<TelegramLink | null>(
+    async () => {
+      const { data } = await supabase.from('telegram_links').select('chat_id, username, enabled, linked_at').maybeSingle();
+      return data && data.chat_id ? (data as TelegramLink) : null;
+    },
+    userId ? `tg:${userId}` : null,
+    null
+  );
+}
+
+/** Deep link that opens the bot with a one-time code. */
+export async function telegramConnectLink(lang: string): Promise<string> {
+  const res = await fetch('/api/telegram/link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang }) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.ok) throw new Error(json.error || 'Telegram is not set up yet');
+  return json.url as string;
+}
+export const telegramSetEnabled = (on: boolean) => rpc('telegram_set_enabled', { p_enabled: on });
+export const telegramUnlink = () => rpc('telegram_unlink', {});
 
 /* ============================== Tracking ============================== */
 

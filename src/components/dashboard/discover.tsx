@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, ChevronDown, ChevronLeft, ChevronRight, Check } from '@/components/icons';
+import { Bell, Bookmark, ChevronDown, ChevronLeft, ChevronRight, Check } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
-import { type CampaignRow, type Face, type Platform, rateFor, PLATFORM_NAME } from '@/lib/supabase/data';
+import { type CampaignRow, type CategoryKey, type Face, type Platform, rateFor, categoryLabel, CATEGORY_KEYS, PLATFORM_NAME } from '@/lib/supabase/data';
 import { PlatformIcon, money, kzt } from './ui';
 import { moneyState } from '@/lib/money';
+import { LevelMedal } from './levels';
 import { NotchButton } from '@/components/pi';
 
 // Discover building blocks — structure of Whop "Content Rewards", rebuilt on Clipte data and tokens.
@@ -132,7 +133,7 @@ function Cover({ c, className = '' }: { c: CampaignRow; className?: string }) {
  * Discover card. The outer box reserves a fixed footprint; the inner card is centered on it
  * and grows on hover (description, rules, Join button) over its neighbours, like Content Rewards.
  */
-export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = true }: { c: CampaignRow; stats?: Stats; index?: number; fixedWidth?: boolean; interactive?: boolean }) {
+export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = true, href }: { c: CampaignRow; stats?: Stats; index?: number; fixedWidth?: boolean; interactive?: boolean; href?: string }) {
   const { t } = useLanguage();
   const n = cardNumbers(c);
   const clippers = Math.max(0, stats?.clippers ?? 0);
@@ -147,6 +148,11 @@ export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = tr
       <div className="cr-card relative aspect-video w-full overflow-hidden rounded-t-2xl bg-[var(--pi-line)] lg:group-hover/card:rounded-2xl!">
         <Cover c={c} className={interactive ? 'transition-transform duration-[1200ms] ease-out lg:group-hover/card:scale-[1.03]!' : ''} />
         {interactive && <SaveButton id={c.id} />}
+        {c.min_level && (
+          <span className="cr-chip absolute left-2.5 top-2.5 z-[2] flex h-7 items-center gap-1 rounded-full pl-1 pr-2.5 text-[11px] font-semibold text-[var(--pi-ink-strong)]" title={t('lvl.premiumTip')}>
+            <LevelMedal level={c.min_level} className="size-5" /> {t(`lvl.${c.min_level}`)}+
+          </span>
+        )}
       </div>
 
       {/* the split: a badge row opens between the halves on hover */}
@@ -157,7 +163,7 @@ export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = tr
               {c.category && (
                 <Tip below text={t('card.categoryTip')} align="left">
                   <span className="cr-chip relative flex h-6 min-w-0 cursor-help items-center truncate rounded-full px-2.5 text-[11px] font-semibold text-[var(--pi-ink-strong)]">
-                    {c.category.split('&')[0].trim()}
+                    {categoryLabel(c.category, t).split('&')[0].trim()}
                   </span>
                 </Tip>
               )}
@@ -280,7 +286,7 @@ export function DiscoverCard({ c, stats, index = 0, fixedWidth, interactive = tr
 
   return (
     <Link
-      href={`/dashboard/campaigns/${c.id}`}
+      href={href || `/dashboard/campaigns/${c.id}`}
       aria-label={c.title}
       className={`group/card cr-enter relative block shrink-0 text-left focus-visible:outline-none lg:hover:z-30! ${fixedWidth ? 'w-[264px] sm:w-[280px]!' : 'w-full'}`}
       style={{ ['--enter-d' as string]: Math.min(index, 12) * 25 }}
@@ -419,7 +425,7 @@ export function HeroCarousel({ campaigns }: { campaigns: CampaignRow[] }) {
                   <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-[14px] font-light text-white/70">
                     {c.category && (
                       <>
-                        <span>{c.category}</span>
+                        <span>{categoryLabel(c.category, t)}</span>
                         <span className="text-white/40">·</span>
                       </>
                     )}
@@ -539,3 +545,61 @@ export const platformOptions = (all: Platform[] = ['tiktok', 'youtube', 'instagr
       </>
     ),
   }));
+
+/* ------------------------------ category alerts ------------------------------ */
+
+/** "Alerts" pill: follow categories to hear about new campaigns (bell + Telegram). */
+export function AlertsPill({ follows, onToggle }: { follows: string[]; onToggle: (c: CategoryKey) => void }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setOpen(false);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        data-active={follows.length > 0}
+        className="cr-outline-pill flex h-9 items-center gap-1.5 rounded-full px-3 text-[14px] text-[var(--pi-ink)] transition-[transform,border-color] duration-150 active:scale-[0.95] cursor-pointer"
+      >
+        <Bell className="size-3.5" />
+        {t('disc.alerts')}
+        {follows.length > 0 && <span className="tabular-nums text-[var(--pi-muted)]">{follows.length}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-11 z-50 w-[280px] rounded-2xl border border-[var(--pi-line)] bg-[var(--pi-surface)] p-3 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.35)] sm:left-0! sm:right-auto!">
+          <p className="px-1 text-[13px] text-[var(--pi-ink-strong)]">{t('disc.alertsTitle')}</p>
+          <p className="mb-2 px-1 text-xs font-light text-[var(--pi-muted)]">{t('disc.alertsDesc')}</p>
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORY_KEYS.map((c) => {
+              const on = follows.includes(c);
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => onToggle(c)}
+                  className={`flex h-8 items-center gap-1 rounded-full px-3 text-[13px] transition-colors cursor-pointer ${
+                    on ? 'bg-[var(--pi-btn)] text-[var(--pi-btn-fg)]' : 'bg-[var(--pi-line)] text-[var(--pi-ink)] hover:text-[var(--pi-ink-strong)]'
+                  }`}
+                >
+                  {on && <Check className="size-3.5" />}
+                  {t(`create.cat.${c}`)}
+                </button>
+              );
+            })}
+          </div>
+          <a href="/dashboard/accounts#notifications" className="mt-3 block px-1 text-xs text-[var(--pi-ink)] underline-offset-4 hover:underline">
+            {t('disc.alertsTg')}
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -196,6 +196,46 @@ src/
 
 ## История изменений (Changelog)
 
+### [2026-10-18] — Telegram-уведомления, апелляции, рефералы, уровни, оповещения о категориях, публичные страницы кампаний
+- **Миграция `supabase/migrations/2026-10-18_v2_9.sql`** (генерируется вместе со `schema.sql`; функции `guard_clip`, `guard_campaign`, `settle_clip`, `notify_clip` заменены на месте):
+  - **уровни:** `level_for` / `level_rank` / `level_hold_hours`, `paid_views_of`, `my_paid_views`, `my_level`, `creator_level`;
+    - холд зависит от уровня;
+    - `campaigns.min_level` проверяется при отправке клипа и блокируется на живой кампании;
+  - **`settle_clip`:**
+    - уведомление `clip_earned` (≥ $1, не чаще раза в 12 ч на клип; первая выплата приходит как `clip_verified` с суммой);
+    - реферальная награда 5% с первых $100 (`referral_rewards`, `my_referrals`);
+    - `level_up`;
+  - **апелляции:** `clip_appeals`, `appeal_clip`, `decide_appeal`, уведомления `new_appeal` (staff), `appeal_accepted` / `appeal_declined`;
+  - **категории:** перенос в ключи, `category_follows`, триггер `notify_category_followers` → `new_campaign`;
+  - **Telegram:**
+    - `telegram_links`, `telegram_link_code`, `telegram_connect`, `telegram_chat_enabled`, `telegram_set_enabled`, `telegram_unlink`;
+    - `configure_telegram` (Vault), `telegram_text` (en/ru/kk, HTML, названия уровней и категорий переведены);
+    - триггер `telegram_on_notification` → `net.http_post` с кнопкой «Открыть Clipte». Любая ошибка игнорируется, уведомление сохраняется всегда;
+  - **`claim_referral`** — реф-код после регистрации через Google.
+  - Тесты 190/190 (+57); миграция проверена на старых подписях категорий и при повторном запуске.
+- **Сервер:**
+  - `src/lib/telegram.ts`: Bot API, `getMe`, секрет webhook из хэша токена, тексты бота en/ru/kk;
+  - `/api/telegram/link` — deep link `t.me/<bot>?start=<код>`;
+  - `/api/telegram/webhook` — команды `/start <код>`, `/start`, `/stop`;
+  - `/api/telegram/setup` (админ) — `setWebhook`, `setMyCommands`, `configure_telegram`.
+- **UI:**
+  - Настройки → вкладка «Уведомления» (`NotificationSettings.tsx`): подключение Telegram с автообновлением статуса, пауза / отключение, чипы категорий;
+  - колокольчик: новые типы и иконки, ссылка «Получать в Telegram»;
+  - `ClipDetail` — форма апелляции и её статус; Модерация → вкладка «Апелляции» с принятием или отклонением и ответом;
+  - Команды → реферальная программа: ссылка, кнопки Telegram и WhatsApp, статистика, прогресс приглашённых до $100;
+  - `levels.tsx`: медали, `LevelBadge`, `LevelCard` в Обзоре клипера, бейдж уровня в профиле автора;
+  - создание кампании: «Кто может участвовать»; категория сохраняется ключом;
+  - бейдж «Gold+» на карточках и странице кампании, блок «недоступно — нужно ещё N просмотров»;
+  - Discover: кнопка «Оповещения»; Админ → Трекинг: карточка Telegram-бота;
+  - регистрация запоминает `?ref=` в localStorage, оболочка дашборда вызывает `claim_referral`;
+  - `categoryLabel()` переводит ключи категорий везде.
+- **SEO:**
+  - публичные `/campaigns` и `/campaigns/[id]` (серверные, ISR 5 мин; `src/lib/supabase/public.ts` с publishable-ключом, без ссылки на футаж, fallback до v2.9);
+  - метаданные, Open Graph / Twitter, JSON-LD хлебных крошек;
+  - `sitemap.ts` (все публичные страницы и кампании) и `robots.ts`;
+  - `metadataBase`; `ROUTES.campaigns` → `/campaigns` (ссылки в шапке и футере).
+- Демо-сид: категории ключами. Замечание: `auth.admin.listUsers` падает с «Database error finding users» из-за демо-пользователя, вставленного SQL-ом; пройдёт после `remove_demo.sql`.
+
 ### [2026-10-18] — Статистика для клиперов, брендов и админа; тенге; превью клипа; сохранённые кампании
 - **Графики** (`src/components/dashboard/charts.tsx`, без библиотек, анимированные, светлая и тёмная тема):
   - `AreaChart` — плавная линия, наведение, тултип, пунктир прошлого периода;

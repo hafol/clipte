@@ -6,7 +6,8 @@ export const ROUTES = {
   register: '/register',
   login: '/login',
   dashboard: '/dashboard',
-  campaigns: '/dashboard/campaigns',
+  campaigns: '/campaigns', // public list (search engines); the dashboard has its own Discover
+  campaign: (id: string) => `/campaigns/${id}`,
 
   // Product
   clip: '/clip',
@@ -30,7 +31,7 @@ export const ROUTES = {
 } as const;
 
 /** Routes that render the landing design system (smooth scroll, custom scrollbar). */
-export const PI_ROUTE_PREFIXES = ['/blog', '/guides', '/contact', '/clip', '/brands', '/enterprise', '/docs', '/compare', '/legal'];
+export const PI_ROUTE_PREFIXES = ['/campaigns', '/blog', '/guides', '/contact', '/clip', '/brands', '/enterprise', '/docs', '/compare', '/legal'];
 
 export const isPiRoute = (pathname: string) =>
   pathname === '/' || PI_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -3,7 +3,9 @@ import { EmptyNotifications } from '@/components/illustrations';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, BadgeCheck, CircleDollarSign, Flag, Megaphone, Video, XCircle, CheckCheck } from '@/components/icons';
+import { Bell, BadgeCheck, CircleDollarSign, Flag, Megaphone, Star, Users, Video, XCircle, CheckCheck } from '@/components/icons';
+import { categoryLabel, useTelegramLink } from '@/lib/supabase/data';
+import { money } from '@/lib/money';
 import { useLanguage } from '@/context/LanguageContext';
 import { useNotifications, type AppNotification } from '@/lib/supabase/notifications';
 import { timeAgo } from './forms';
@@ -20,12 +22,24 @@ const ICON: Record<string, React.ElementType> = {
   payout_completed: CircleDollarSign,
   payout_failed: XCircle,
   account_verified: BadgeCheck,
+  clip_earned: CircleDollarSign,
+  appeal_accepted: BadgeCheck,
+  appeal_declined: XCircle,
+  new_appeal: Flag,
+  referral_reward: Users,
+  level_up: Star,
+  new_campaign: Megaphone,
 };
 const TONE: Record<string, string> = {
   clip_verified: 'text-emerald-600',
   campaign_approved: 'text-emerald-600',
   payout_completed: 'text-emerald-600',
   account_verified: 'text-emerald-600',
+  clip_earned: 'text-emerald-600',
+  appeal_accepted: 'text-emerald-600',
+  referral_reward: 'text-emerald-600',
+  level_up: 'text-amber-500',
+  appeal_declined: 'text-rose-600',
   clip_rejected: 'text-rose-600',
   campaign_rejected: 'text-rose-600',
   payout_failed: 'text-rose-600',
@@ -37,9 +51,15 @@ export function notificationText(n: AppNotification, t: (k: string) => string) {
   const fill = (s: string) =>
     s
       .replace('{campaign}', d.campaign ?? '')
-      .replace('{amount}', d.amount != null ? `$${Number(d.amount).toFixed(2)}` : '')
+      .replace('{amount}', d.amount != null ? money(Number(d.amount)) : '')
       .replace('{handle}', d.handle ? `@${d.handle}` : '')
-      .replace('{platform}', d.platform ?? '');
+      .replace('{platform}', d.platform ?? '')
+      .replace('{name}', d.name ?? '—')
+      .replace('{brand}', d.brand ?? '')
+      .replace('{level}', d.level ? t(`lvl.${d.level}`) : '')
+      .replace('{hours}', d.hours != null ? String(d.hours) : '')
+      .replace('{category}', categoryLabel(d.category, t))
+      .replace('{cpm}', d.cpm != null ? money(Number(d.cpm)) : '');
   return { title: fill(t(`notif.${n.kind}`)), detail: d.reason ? String(d.reason) : d.reference ? String(d.reference) : null };
 }
 
@@ -47,6 +67,7 @@ export default function NotificationsBell({ userId, className = '' }: { userId: 
   const { t, lang } = useLanguage();
   const router = useRouter();
   const { items, loading, unread, markAllRead, markRead } = useNotifications(userId);
+  const { data: tgLink, loading: tgLoading } = useTelegramLink(userId);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -124,6 +145,20 @@ export default function NotificationsBell({ userId, className = '' }: { userId: 
               </ul>
             )}
           </div>
+          {!tgLoading && !tgLink && (
+            // plain link: a hash change must fire `hashchange` so Settings opens the right tab
+            <a
+              href="/dashboard/accounts#notifications"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 border-t border-[var(--pi-line)] px-4 py-3 text-[13px] text-[var(--pi-ink)] transition-colors hover:bg-[var(--pi-line)] hover:text-[var(--pi-ink-strong)]"
+            >
+              <svg viewBox="0 0 24 24" className="size-5 shrink-0" aria-hidden>
+                <circle cx="12" cy="12" r="12" fill="#2AABEE" />
+                <path d="M5.4 11.8 16.9 7.4c.53-.19 1 .13.83.94l-1.96 9.2c-.15.66-.54.82-1.09.51l-3-2.21-1.45 1.4c-.16.16-.3.3-.6.3l.21-3.06 5.56-5.02c.24-.21-.05-.33-.38-.12l-6.87 4.33-2.96-.93c-.64-.2-.66-.64.14-.95Z" fill="#fff" />
+              </svg>
+              {t('ns.bellCta')}
+            </a>
+          )}
         </div>
       )}
     </div>

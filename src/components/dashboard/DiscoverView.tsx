@@ -4,10 +4,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bookmark, Search, X } from '@/components/icons';
 import { EmptyCampaigns } from '@/components/illustrations';
 import { useLanguage } from '@/context/LanguageContext';
-import { useLiveCampaigns, useSavedCampaigns, errText, topCpm, type Platform, type CampaignRow } from '@/lib/supabase/data';
+import { useLiveCampaigns, useSavedCampaigns, useCategoryFollows, errText, topCpm, categoryLabel, type Platform, type CampaignRow } from '@/lib/supabase/data';
 import { useUserProfile } from '@/lib/supabase/hooks';
 import { EmptyState, ErrorNote } from '@/components/dashboard/ui';
-import { CardRow, DiscoverCard, FilterPill, HeroCarousel, SavedContext, platformOptions } from '@/components/dashboard/discover';
+import { AlertsPill, CardRow, DiscoverCard, FilterPill, HeroCarousel, SavedContext, platformOptions } from '@/components/dashboard/discover';
 import { useToast } from '@/components/dashboard/forms';
 
 // Discover marketplace (Content Rewards structure). Used by /dashboard/campaigns in clipper mode
@@ -23,6 +23,7 @@ export default function DiscoverView() {
   const saved = useSavedCampaigns(profile?.id);
   const { toast, toastNode } = useToast();
   const [onlySaved, setOnlySaved] = useState(false);
+  const alerts = useCategoryFollows(profile?.id);
   const savedCtx = useMemo(
     () => ({
       isSaved: saved.isSaved,
@@ -79,7 +80,7 @@ export default function DiscoverView() {
         (!onlySaved || saved.isSaved(c.id)) &&
         (!platform || c.platforms.includes(platform)) &&
         (!category || c.category === category) &&
-        (!needle || `${c.title} ${c.brand_name} ${c.category || ''} ${c.description || ''}`.toLowerCase().includes(needle))
+        (!needle || `${c.title} ${c.brand_name} ${categoryLabel(c.category, t)} ${c.description || ''}`.toLowerCase().includes(needle))
     );
     return out.sort(sorters[sort || 'new']);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,9 +172,19 @@ export default function DiscoverView() {
             )}
             <FilterPill label={t('disc.platform')} value={platform} onChange={setPlatform} options={platformOptions()} />
             {categories.length > 0 && (
-              <FilterPill label={t('disc.category')} value={category} onChange={setCategory} options={categories.map((c) => ({ id: c, label: c }))} />
+              <FilterPill label={t('disc.category')} value={category} onChange={setCategory} options={categories.map((c) => ({ id: c, label: categoryLabel(c, t) }))} />
             )}
             <FilterPill label={t('disc.sort')} value={sort} onChange={setSort} options={sortOptions} />
+            <span className="ml-auto" />
+            <AlertsPill
+              follows={alerts.follows}
+              onToggle={(c) =>
+                alerts
+                  .toggle(c)
+                  .then((on) => toast(on ? t('disc.alertOn').replace('{c}', t(`create.cat.${c}`)) : t('disc.alertOff')))
+                  .catch((e) => toast(errText(e), 'red'))
+              }
+            />
           </div>
 
           {!filtering && savedList.length > 0 && <CardRow title={t('disc.rowSaved')} campaigns={savedList} stats={stats} />}

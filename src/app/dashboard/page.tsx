@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { ArrowUpRight, Check } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile, type Profile } from '@/lib/supabase/hooks';
-import { useClipperOverview, useBrandOverview, useClipDeltas, topCpm, type ClipRow, type CampaignRow } from '@/lib/supabase/data';
+import { useClipperOverview, useBrandOverview, useClipDeltas, useMyLevel, topCpm, type ClipRow, type CampaignRow } from '@/lib/supabase/data';
+import { LevelCard } from '@/components/dashboard/levels';
 import Performance from '@/components/dashboard/Performance';
 import ClipDetail from '@/components/dashboard/ClipDetail';
 import { NotchButton } from '@/components/pi';
@@ -35,6 +36,7 @@ function ClipperOverview({ profile }: { profile: Profile }) {
   const [open, setOpen] = useState<ClipRow | null>(null);
   const recentIds = useMemo(() => clips.slice(0, 6).map((c) => c.id), [clips]);
   const { data: deltas } = useClipDeltas(recentIds);
+  const { data: level } = useMyLevel(true);
 
   const views = clips.reduce((a, c) => a + c.view_count, 0);
   const onHold = clips.filter((c) => c.status === 'tracking_hold').length;
@@ -78,6 +80,8 @@ function ClipperOverview({ profile }: { profile: Profile }) {
       />
 
       {!loading && steps.some((s) => !s.done) && <Checklist title={t('overview.startTitle')} steps={steps} t={t} />}
+
+      {level && clips.length > 0 && <LevelCard data={level} />}
 
       {clips.length > 0 && <Performance scope="me" moneyLabel={t('stats.earned')} clipsLabel={t('stats.submitted')} />}
 

@@ -7,15 +7,15 @@ import { AlertTriangle, Check, ExternalLink } from '@/components/icons';
 import { useLanguage } from '@/context/LanguageContext';
 import { useUserProfile } from '@/lib/supabase/hooks';
 import {
-  useStaffQueue, approveCampaign, rejectCampaign, moderateClip, recordViews, staffVerifyAccount, errText, topCpm, PLATFORM_NAME,
-  type CampaignRow, type ClipRow,
+  useStaffQueue, useStaffAppeals, decideAppeal, approveCampaign, rejectCampaign, moderateClip, recordViews, staffVerifyAccount, errText, topCpm, PLATFORM_NAME,
+  type CampaignRow, type ClipRow, type StaffAppeal,
 } from '@/lib/supabase/data';
 import { PageHeader, StatStrip, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, money, compact, CLIP_TONE, CAMPAIGN_TONE } from '@/components/dashboard/ui';
 import { Btn, Field, Modal, Notice, Segmented, Tabs, boxInputCls, inputCls, timeAgo, useToast } from '@/components/dashboard/forms';
 import { CampaignCover, PlatformList } from '@/components/dashboard/campaign';
 
 type T = (k: string) => string;
-type Tab = 'campaigns' | 'clips' | 'accounts';
+type Tab = 'campaigns' | 'clips' | 'appeals' | 'accounts';
 
 const PROFILE_URL = {
   tiktok: (h: string) => `https://www.tiktok.com/@${h}`,
@@ -34,6 +34,8 @@ export default function ModerationPage() {
   const { data, loading, error, refresh } = useStaffQueue(!!isStaff);
   const { toast, toastNode } = useToast();
   const [tab, setTab] = useState<Tab>('campaigns');
+  const { data: appealList, refresh: refreshAppeals } = useStaffAppeals(!!isStaff);
+  const openAppeals = appealList.filter((a) => a.status === 'open').length;
   const [clipFilter, setClipFilter] = useState<'manual' | 'hold' | 'flagged' | 'verified'>('manual');
   const [rejecting, setRejecting] = useState<CampaignRow | null>(null);
   const [clipAction, setClipAction] = useState<{ clip: ClipRow; kind: 'views' | 'rejected' | 'flagged' } | null>(null);
@@ -85,6 +87,7 @@ export default function ModerationPage() {
         items={[
           { id: 'campaigns', label: t('mod.tabCampaigns'), count: review.length },
           { id: 'clips', label: t('mod.tabClips'), count: data.clips.length },
+          { id: 'appeals', label: t('ap.tab'), count: openAppeals },
           { id: 'accounts', label: t('mod.tabAccounts'), count: data.accounts.length },
         ]}
       />
@@ -236,6 +239,18 @@ export default function ModerationPage() {
         </div>
       )}
 
+      {tab === 'appeals' && (
+        <AppealsQueue
+          t={t}
+          lang={lang}
+          toast={toast}
+          onChanged={() => {
+            refresh();
+            refreshAppeals();
+          }}
+        />
+      )}
+
       {/* ---------- accounts ---------- */}
       {!loading && tab === 'accounts' && (
         <div className="space-y-6">
@@ -385,5 +400,117 @@ function ClipDialog({
         </div>
       </div>
     </Modal>
+  );
+}
+
+/* ============================== appeals ============================== */
+
+function AppealsQueue({ t, lang, toast, onChanged }: { t: T; lang: string; toast: (m: string, tone?: 'green' | 'red') => void; onChanged: () => void }) {
+  const { data: appeals, loading, refresh } = useStaffAppeals(true);
+  const [filter, setFilter] = useState<'open' | 'done'>('open');
+  const [acting, setActing] = useState<{ a: StaffAppeal; accept: boolean } | null>(null);
+  const [reply, setReply] = useState('');
+  const [busy, setBusy] = useState(false);
+  const list = appeals.filter((a) => (filter === 'open' ? a.status === 'open' : a.status !== 'open'));
+
+  const decide = async () => {
+    if (!acting) return;
+    setBusy(true);
+    try {
+      await decideAppeal(acting.a.id, acting.accept, reply.trim());
+      toast(acting.accept ? t('ap.acceptedToast') : t('ap.declinedToast'));
+      setActing(null);
+      setReply('');
+      refresh();
+      onChanged();
+    } catch (e) {
+      toast(errText(e), 'red');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) return <SkeletonRows rows={3} />;
+  return (
+    <div className="space-y-6">
+      <Segmented
+        value={filter}
+        onChange={setFilter}
+        items={[
+          { id: 'open', label: `${t('ap.open')} · ${appeals.filter((a) => a.status === 'open').length}` },
+          { id: 'done', label: t('ap.decided') },
+        ]}
+      />
+      {list.length === 0 ? (
+        <EmptyState art={<Success />} title={filter === 'open' ? t('ap.none') : t('disc.noneHere')} />
+      ) : (
+        <ul className="space-y-3">
+          {list.map((a) => (
+            <li key={a.id} className="pi-notch pi-edge space-y-3 bg-[var(--pi-surface)] p-5">
+              <div className="flex flex-wrap items-center gap-3">
+                {a.clip && (
+                  <span className="pi-notch flex size-9 shrink-0 items-center justify-center bg-[var(--pi-line)] text-[var(--pi-ink-strong)]">
+                    <PlatformIcon platform={a.clip.platform} />
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-[var(--pi-ink-strong)]">
+                    {a.clip?.campaign?.title || '—'} · {a.author?.full_name || '—'}
+                    {a.clip?.account?.handle ? ` · @${a.clip.account.handle}` : ''}
+                  </span>
+                  <span className="block truncate text-xs text-[var(--pi-muted)]">
+                    {timeAgo(a.created_at, lang)} · {compact(a.clip?.view_count || 0)} {t('common.views')}
+                    {a.clip?.status_reason ? ` · ${a.clip.status_reason}` : ''}
+                  </span>
+                </div>
+                {a.clip && <Chip tone={CLIP_TONE[a.clip.status]}>{t(`dash.clipStatus.${a.clip.status}`)}</Chip>}
+                {a.status !== 'open' && <Chip tone={a.status === 'accepted' ? 'green' : 'red'}>{t(`ap.st_${a.status}`)}</Chip>}
+              </div>
+              <p className="rounded-lg bg-[var(--pi-bg)] px-4 py-3 text-sm font-light leading-relaxed text-[var(--pi-ink-strong)]">{a.message}</p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
+                {a.clip && (
+                  <a href={a.clip.video_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--pi-ink)] hover:text-[var(--pi-ink-strong)] hover:underline">
+                    {t('ap.openClip')} <ExternalLink className="size-3" />
+                  </a>
+                )}
+                {a.proof_url && (
+                  <a href={a.proof_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[var(--pi-ink)] hover:text-[var(--pi-ink-strong)] hover:underline">
+                    {t('ap.openProof')} <ExternalLink className="size-3" />
+                  </a>
+                )}
+                {a.reply && <span className="text-[var(--pi-muted)]">↳ {a.reply}</span>}
+                {a.status === 'open' && (
+                  <span className="ml-auto flex gap-1.5">
+                    <Btn size="sm" onClick={() => setActing({ a, accept: true })}>
+                      {t('ap.accept')}
+                    </Btn>
+                    <Btn size="sm" variant="ghost" onClick={() => setActing({ a, accept: false })}>
+                      {t('ap.decline')}
+                    </Btn>
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Modal open={!!acting} onClose={() => setActing(null)} title={acting?.accept ? t('ap.accept') : t('ap.decline')}>
+        <div className="space-y-5">
+          <p className="text-sm font-light text-[var(--pi-ink)]">{acting?.accept ? t('ap.acceptDesc') : t('ap.declineDesc')}</p>
+          <Field label={t('ap.reply')} hint={t('ap.replyHint')}>
+            <input autoFocus value={reply} onChange={(e) => setReply(e.target.value)} maxLength={300} className={inputCls} />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Btn variant="ghost" onClick={() => setActing(null)}>
+              {t('common.cancel')}
+            </Btn>
+            <Btn variant={acting?.accept ? 'solid' : 'danger'} onClick={decide} loading={busy} disabled={!acting?.accept && reply.trim().length < 3}>
+              {t('common.confirm')}
+            </Btn>
+          </div>
+        </div>
+      </Modal>
+    </div>
   );
 }

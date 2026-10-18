@@ -1,4 +1,5 @@
 'use client';
+import NotificationSettings from '@/components/dashboard/NotificationSettings';
 import { VerifyAccount } from '@/components/illustrations';
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -13,7 +14,7 @@ import { PageHeader, Chip, EmptyState, ErrorNote, PlatformIcon, SkeletonRows, La
 import { Btn, CopyButton, Field, Modal, Notice, Select, Tabs, boxInputCls, inputCls, useToast } from '@/components/dashboard/forms';
 
 type T = (k: string) => string;
-type Tab = 'social' | 'profile' | 'brand';
+type Tab = 'social' | 'notifications' | 'profile' | 'brand';
 
 const PROFILE_URL: Record<Platform, (h: string) => string> = {
   tiktok: (h) => `https://www.tiktok.com/@${h}`,
@@ -27,9 +28,15 @@ export default function AccountsPage() {
   const [tab, setTab] = useState<Tab>('social');
   const { toast, toastNode } = useToast();
 
+  // #profile / #brand / #notifications open that tab (also when the hash changes on this page)
   useEffect(() => {
-    const h = typeof window !== 'undefined' ? window.location.hash.replace('#', '') : '';
-    if (h === 'profile' || h === 'brand') setTab(h);
+    const pick = () => {
+      const h = window.location.hash.replace('#', '');
+      if (h === 'profile' || h === 'brand' || h === 'notifications') setTab(h);
+    };
+    pick();
+    window.addEventListener('hashchange', pick);
+    return () => window.removeEventListener('hashchange', pick);
   }, []);
 
   if (!profile) return null;
@@ -43,11 +50,13 @@ export default function AccountsPage() {
         onChange={setTab}
         items={[
           { id: 'social', label: t('acc.tabSocial') },
+          { id: 'notifications', label: t('acc.tabNotifications') },
           { id: 'profile', label: t('acc.tabProfile') },
           { id: 'brand', label: t('acc.tabBrand') },
         ]}
       />
       {tab === 'social' && <SocialTab profile={profile} t={t} toast={toast} />}
+      {tab === 'notifications' && <NotificationSettings userId={profile.id} toast={toast} />}
       {tab === 'profile' && <ProfileTab profile={profile} t={t} toast={toast} onSaved={refreshProfile} />}
       {tab === 'brand' && <BrandTab profile={profile} t={t} toast={toast} onSaved={refreshProfile} />}
     </div>

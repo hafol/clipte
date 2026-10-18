@@ -26,7 +26,7 @@ insert into public.campaigns
    platforms, platform_rates, cpm_rate, escrow_budget, remaining_budget, views_delivered, status, created_at)
 values
   ('d3d3d3d3-c000-4000-8000-000000000001', 'd3d3d3d3-0000-4000-8000-000000000001',
-   'Best moments from The Late Talk podcast', 'Late Talk', 'Podcasts & interviews',
+   'Best moments from The Late Talk podcast', 'Late Talk', 'podcasts',
    'https://drive.google.com/drive/folders/demo-late-talk',
    'https://images.unsplash.com/photo-1590602847861-f357a9332bbc?w=1280&auto=format&fit=crop&q=80',
    array['#latetalk', '#podcast', '#clipte'],
@@ -38,7 +38,7 @@ values
    1.5, 4000, 2850, 657000, 'active', now() - interval '6 days'),
 
   ('d3d3d3d3-c000-4000-8000-000000000002', 'd3d3d3d3-0000-4000-8000-000000000001',
-   'Ranked clutch plays & funny fails', 'Respawn Arena', 'Gaming',
+   'Ranked clutch plays & funny fails', 'Respawn Arena', 'gaming',
    'https://drive.google.com/drive/folders/demo-respawn',
    'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1280&auto=format&fit=crop&q=80',
    array['#respawnarena', '#gaming', '#clutch'],
@@ -50,7 +50,7 @@ values
    1.5, 2500, 2100, 210000, 'active', now() - interval '3 days'),
 
   ('d3d3d3d3-c000-4000-8000-000000000003', 'd3d3d3d3-0000-4000-8000-000000000001',
-   'AI app feature demos in 30 seconds', 'Nova AI', 'Tech & apps',
+   'AI app feature demos in 30 seconds', 'Nova AI', 'tech',
    'https://drive.google.com/drive/folders/demo-nova',
    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1280&auto=format&fit=crop&q=80',
    array['#novaai', '#ai', '#productivity'],
@@ -62,7 +62,7 @@ values
    2.25, 6000, 5400, 240000, 'active', now() - interval '1 day'),
 
   ('d3d3d3d3-c000-4000-8000-000000000004', 'd3d3d3d3-0000-4000-8000-000000000001',
-   'Street football skills from the summer cup', 'Urban Cup', 'Sports',
+   'Street football skills from the summer cup', 'Urban Cup', 'sports',
    'https://drive.google.com/drive/folders/demo-urban-cup',
    null,
    array['#urbancup', '#football', '#skills'],
@@ -74,7 +74,7 @@ values
    1.25, 1500, 1320, 144000, 'active', now() - interval '9 days'),
 
   ('d3d3d3d3-c000-4000-8000-000000000005', 'd3d3d3d3-0000-4000-8000-000000000001',
-   'Money tips that fit in one clip', 'Smart Coin', 'Finance',
+   'Money tips that fit in one clip', 'Smart Coin', 'finance',
    'https://drive.google.com/drive/folders/demo-smart-coin',
    'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1280&auto=format&fit=crop&q=80',
    array['#smartcoin', '#money', '#tips'],
@@ -86,7 +86,7 @@ values
    2.0, 3000, 2950, 22000, 'active', now() - interval '12 hours'),
 
   ('d3d3d3d3-c000-4000-8000-000000000006', 'd3d3d3d3-0000-4000-8000-000000000001',
-   'Live session highlights — new album tour', 'Moonline', 'Music',
+   'Live session highlights — new album tour', 'Moonline', 'music',
    'https://drive.google.com/drive/folders/demo-moonline',
    null,
    array['#moonline', '#livemusic', '#tour'],

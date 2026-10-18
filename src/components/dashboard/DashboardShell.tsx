@@ -17,6 +17,7 @@ import MessengerDrawer from '@/components/messenger/MessengerDrawer';
 import NotificationsBell from '@/components/dashboard/NotificationsBell';
 import { MessengerProvider, useMessenger } from '@/lib/supabase/messenger';
 import { money } from '@/lib/money';
+import { claimReferral } from '@/lib/supabase/data';
 
 type NavItem = { label: string; href: string; icon: React.ElementType; exact?: boolean };
 
@@ -54,6 +55,25 @@ export default function DashboardShell({ children }: { children: React.ReactNode
   const [collapsed, setCollapsed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // invite code remembered at sign-up (Google sign-ups lose it in OAuth) → claim once
+  useEffect(() => {
+    if (!profile) return;
+    let code: string | null = null;
+    try {
+      code = localStorage.getItem('clipte_ref');
+    } catch {}
+    if (!code) return;
+    if (profile.referral_code === code) {
+      localStorage.removeItem('clipte_ref');
+      return;
+    }
+    claimReferral(code).finally(() => {
+      try {
+        localStorage.removeItem('clipte_ref');
+      } catch {}
+    });
+  }, [profile]);
 
   const mode = profile?.active_mode || 'clipper';
   const isStaff = profile?.role === 'moderator' || profile?.role === 'admin';

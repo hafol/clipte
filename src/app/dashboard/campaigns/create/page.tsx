@@ -12,6 +12,7 @@ import {
 } from '@/lib/supabase/data';
 import { PageHeader, PlatformIcon, Label, usd, compact } from '@/components/dashboard/ui';
 import { Btn, Field, Notice, Segmented, Select, boxInputCls, inputCls } from '@/components/dashboard/forms';
+import { LevelMedal } from '@/components/dashboard/levels';
 import { FundPanel } from '@/components/dashboard/campaign';
 import { DiscoverCard } from '@/components/dashboard/discover';
 
@@ -68,6 +69,7 @@ export default function CreateCampaignPage() {
   const [title, setTitle] = useState('');
   const [brandName, setBrandName] = useState('');
   const [category, setCategory] = useState<(typeof CATEGORIES)[number]>('podcasts');
+  const [minLevel, setMinLevel] = useState<'all' | 'silver' | 'gold' | 'platinum'>('all');
   const [platforms, setPlatforms] = useState<Platform[]>(['tiktok', 'youtube', 'instagram']);
   const [cover, setCover] = useState<string | null>(null);
   const [coverErr, setCoverErr] = useState<string | null>(null);
@@ -137,7 +139,8 @@ export default function CreateCampaignPage() {
   const draft: CampaignDraft = {
     title: title.trim(),
     brand_name: brand,
-    category: t(`create.cat.${category}`),
+    category, // stored as a key; every screen translates it (categoryLabel)
+    min_level: minLevel === 'all' ? null : minLevel,
     drive_url: drive.trim(),
     cover_url: cover,
     icon_url: profile?.brand_logo_url || null,
@@ -244,6 +247,20 @@ export default function CreateCampaignPage() {
                   <Select value={category} onChange={setCategory} ariaLabel={t('create.category')} options={CATEGORIES.map((k) => ({ value: k, label: t(`create.cat.${k}`) }))} />
                 </Field>
               </div>
+              <Field label={t('create.who')} hint={minLevel === 'all' ? t('create.whoHintAll') : t('create.whoHint')}>
+                <Segmented
+                  value={minLevel}
+                  onChange={setMinLevel}
+                  items={(['all', 'silver', 'gold', 'platinum'] as const).map((l) => ({
+                    id: l,
+                    label: l === 'all' ? t('create.who_all') : (
+                      <span className="inline-flex items-center gap-1">
+                        <LevelMedal level={l} className="size-4" /> {t(`create.who_${l}`)}
+                      </span>
+                    ),
+                  }))}
+                />
+              </Field>
               <div>
                 <span className="text-[13px] text-[var(--pi-muted)]">{t('camp.platforms')}</span>
                 <div className="mt-2 grid grid-cols-3 gap-2">
@@ -417,7 +434,8 @@ export default function CreateCampaignPage() {
                 {[
                   [t('create.name'), draft.title],
                   [t('create.brand'), draft.brand_name],
-                  [t('create.category'), draft.category],
+                  [t('create.category'), t(`create.cat.${category}`)],
+                  [t('create.who'), t(`create.who_${minLevel}`)],
                   [t('camp.platforms'), platforms.map((p) => PLATFORM_NAME[p]).join(', ')],
                   [t('create.cpm'), platforms.map((p) => `${PLATFORM_NAME[p]} ${usd(Number(effRates[p]?.cpm) || 0)}`).join(' · ')],
                   [t('create.budget'), usd(budgetNum)],

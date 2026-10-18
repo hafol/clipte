@@ -6,6 +6,8 @@ import { LanguageProvider } from '@/context/LanguageContext';
 import IconMotion from '@/components/icons/IconMotion';
 
 export const metadata: Metadata = {
+  // absolute URLs for link previews and canonical tags
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://clipte.vercel.app'),
   title: 'Clipte | Turn Short Clips into Viral Reach & Income',
   description:
     'Get paid to clip. Join brand campaigns and earn per view on TikTok, YouTube Shorts & Instagram Reels.',
